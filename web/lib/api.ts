@@ -12,7 +12,13 @@ export async function api<T = unknown>(path: string, data?: unknown, method?: st
     body: data === undefined ? undefined : stringify(data),
     cache: 'no-store',
   });
-  const out = parse<T & { error?: string }>(await res.text());
+  const text = await res.text();
+  let out: T & { error?: string };
+  try {
+    out = parse(text);
+  } catch {
+    throw new ApiError(res.ok ? 'Unexpected response from server' : `Server error (${res.status})`, res.status);
+  }
   if (!res.ok || out?.error) throw new ApiError(out?.error ?? `Request failed (${res.status})`, res.status);
   return out;
 }

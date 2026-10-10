@@ -6,7 +6,8 @@ import { parse, stringify } from '../json';
 import type { DnieCard, GuardianB } from '../chain';
 import type { LivenessAttestation } from '../liveness';
 
-export const DATA_DIR = process.env.DATA_DIR ?? path.join(process.cwd(), '.data');
+// Vercel's disk is read-only except /tmp, which is per instance and wiped on cold starts.
+export const DATA_DIR = process.env.DATA_DIR ?? (process.env.VERCEL ? '/tmp/sq-data' : path.join(process.cwd(), '.data'));
 const FILE = path.join(DATA_DIR, 'db.json');
 
 export type Owner = { x: bigint; y: bigint; credentialId: string; signer: string };
