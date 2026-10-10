@@ -33,7 +33,13 @@ const isLocal = (o: string) => /\/\/(localhost|127\.|\[::1\])/.test(o);
  * Get a DNIe signature for a request created by the server. The card is read by the Swissquote ID app on an Android
  * phone with NFC (this page, or a QR code from a laptop). The simulated card covers demos without one.
  */
-export function DnieSign({ create, onDone, intro }: { create: () => Promise<DnieRequest>; onDone: (r: DnieRequest) => void; intro?: React.ReactNode }) {
+export function DnieSign({ create, onDone, intro, showRequest = true }: {
+  create: () => Promise<DnieRequest>;
+  onDone: (r: DnieRequest) => void;
+  intro?: React.ReactNode;
+  /** What the card will sign, as the phone app shows it too. Off where `intro` already says it. */
+  showRequest?: boolean;
+}) {
   const [req, setReq] = useState<DnieRequest | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sim, setSim] = useState(false);
@@ -78,7 +84,7 @@ export function DnieSign({ create, onDone, intro }: { create: () => Promise<Dnie
   return (
     <div className="space-y-4">
       {intro}
-      <div className="rounded-2xl bg-bg-weak-50 p-4">
+      {showRequest && <div className="rounded-2xl bg-bg-weak-50 p-4">
         <div className="flex items-start gap-3">
           <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary-alpha-10 text-primary-base"><RiIdCardLine className="size-5" /></span>
           <div className="min-w-0">
@@ -86,7 +92,7 @@ export function DnieSign({ create, onDone, intro }: { create: () => Promise<Dnie
             <ul className="mt-1 space-y-0.5 text-paragraph-xs text-text-sub-600">{req.lines.map((l) => <li key={l}>{l}</li>)}</ul>
           </div>
         </div>
-      </div>
+      </div>}
 
       {isAndroid() ? (
         <FancyButton.Root variant="primary" className="h-12 w-full" asChild>

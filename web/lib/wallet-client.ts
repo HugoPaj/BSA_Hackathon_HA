@@ -5,11 +5,12 @@ import { keccak256, type Hex } from 'viem';
 import { CHAIN_ID } from './config';
 import { Safe, decodeCalls } from './chain';
 import { hexToBytes, signWithPasskey } from './passkey';
-import { api } from './api';
-import type { Evaluation } from './server/policy';
+import { api, ApiError } from './api';
+import { parse, stringify } from './json';
+import type { Evaluation, Progress } from './server/policy';
 import type { Activity } from './server/db';
 
-export type { Evaluation };
+export type { Evaluation, Progress };
 export const rpcUrls = () => ({ node: `${window.location.origin}/api/rpc/node`, bundler: `${window.location.origin}/api/rpc/bundler` });
 
 export type Signer = { credentialId: string; x: bigint; y: bigint };
@@ -34,8 +35,31 @@ export async function buildOp(wallet: string, owner: Signer, deployed: boolean, 
   }
 }
 
-export async function requestSponsorship(userOp: UserOperationV7, stepUpId?: string) {
-  return api<{ evaluation: Evaluation; userOp?: UserOperationV7 }>('/api/sponsor', { userOp, stepUpId });
+type Sponsorship = { evaluation: Evaluation; userOp?: UserOperationV7 };
+
+/** Ask Swissquote to sponsor. The policy streams its progress: the planned checks, then each one as it is decided. */
+export async function requestSponsorship(userOp: UserOperationV7, stepUpId?: string, onProgress?: (p: Progress) => void): Promise<Sponsorship> {
+  const res = await fetch('/api/sponsor', { method: 'POST', headers: { 'content-type': 'application/json' }, body: stringify({ userOp, stepUpId }), cache: 'no-store' });
+  if (!res.ok || !res.body || !res.headers.get('content-type')?.includes('ndjson')) {
+    const out = await res.json().catch(() => null);
+    throw new ApiError(out?.error ?? `Server error (${res.status})`, res.status);
+  }
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buf = '';
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += value;
+    const lines = buf.split('\n');
+    buf = lines.pop()!;
+    for (const line of lines.filter(Boolean)) {
+      const msg = parse<Progress | { result: Sponsorship } | { error: string }>(line);
+      if ('result' in msg) return msg.result;
+      if ('error' in msg) throw new ApiError(msg.error, 500);
+      onProgress?.(msg);
+    }
+  }
+  throw new ApiError('The sponsorship check ended without a result', 500);
 }
 
 /** The passkey prompt. Face ID / Touch ID / Windows Hello / device PIN approves the SafeOp hash. */

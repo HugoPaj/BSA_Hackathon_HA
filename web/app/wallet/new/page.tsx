@@ -160,6 +160,7 @@ function FactorStep({ wallet, factor, setFactor, onNext }: { wallet: string; fac
       {!factor && choice === 'dnie' && (
         <DnieSign
           create={() => api<DnieRequest>('/api/dnie', { action: 'create', purpose: 'enroll' })}
+          showRequest={false}
           onDone={(r) => {
             const card = r.card!;
             setFactor({ type: 'dnie', enrollId: r.id, address: rsaGuardianAddress(wallet, card), ...card, label: card.simulated ? `Simulated ID (${card.holder})` : `ID card of ${card.holder}` });
@@ -316,7 +317,7 @@ function CreateStep({ owner, factor, bankAssisted, contact, onNext }: { owner: P
           <div key={k as string} className="flex items-center justify-between gap-3 px-3 py-2.5 text-paragraph-sm"><span className="text-text-sub-600">{k}</span><span className="text-right text-label-sm text-text-strong-950">{v}</span></div>
         ))}
       </div>
-      {flow.phase !== 'done' && (flow.evaluation || !failed) && <ChecksList evaluation={flow.evaluation} loading={!flow.evaluation} />}
+      {flow.phase !== 'done' && (flow.evaluation || !failed) && <ChecksList evaluation={flow.evaluation} plan={flow.plan} checks={flow.checks} />}
       {prepError && <Alert.Root status="error" variant="lighter" size="small"><Alert.Icon />{prepError}</Alert.Root>}
       {flow.error && <Alert.Root status="error" variant="lighter" size="small"><Alert.Icon />{flow.error}</Alert.Root>}
       {flow.phase === 'done' ? (

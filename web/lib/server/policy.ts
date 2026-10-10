@@ -36,8 +36,13 @@ export function screen(address: string) {
   return SANCTIONED.get(address.toLowerCase()) ?? null;
 }
 
-export async function evaluate(op: UserOperationV7, wallet: WalletRecord, stepUpId?: string): Promise<Evaluation> {
+export type PlannedCheck = Pick<Check, 'id' | 'label'>;
+export type Progress = { plan: PlannedCheck[] } | { check: Check };
+
+/** Run the sponsorship policy. `onProgress` hears which checks will run, then each one as soon as it is decided. */
+export async function evaluate(op: UserOperationV7, wallet: WalletRecord, stepUpId?: string, onProgress?: (p: Progress) => void): Promise<Evaluation> {
   const checks: Check[] = [];
+  const report = (c: Check) => { checks.push(c); onProgress?.({ check: c }); };
   const effects: Effect[] = [];
   const treasury = await opsAddress();
   let decoded: DecodedCall[];
@@ -47,30 +52,47 @@ export async function evaluate(op: UserOperationV7, wallet: WalletRecord, stepUp
     return { decision: 'decline', reason: 'Swissquote could not read this transaction', checks: [{ id: 'allowlist', label: 'Allowlist', status: 'fail', detail: 'Unreadable call data' }], effects, outgoing: 0n, fee: 0n, balanceBefore: 0n, balanceAfter: 0n, security: false };
   }
 
-  // 1. Allowlist: only USDC, approved dApp spenders, and the wallet's own security settings.
-  const unknown = decoded.filter((d) => d.kind === 'unknown');
-  const badSpenders = decoded.filter((d) => d.kind === 'approve' && !ALLOWLIST.has(d.spender.toLowerCase()));
-  const unlimited = decoded.filter((d) => d.kind === 'approve' && d.amount >= UNLIMITED);
-  const largeApproval = decoded.some((d) => d.kind === 'approve' && d.amount >= STEP_UP_THRESHOLD);
-  if (unknown.length) checks.push({ id: 'allowlist', label: 'Allowlist', status: 'fail', detail: `Contract ${shortAddress((unknown[0] as { to: string }).to)} is not on Swissquote's allowlist` });
-  else if (badSpenders.length) checks.push({ id: 'allowlist', label: 'Allowlist', status: 'fail', detail: `Approval to unverified contract ${shortAddress((badSpenders[0] as { spender: string }).spender)}` });
-  else if (unlimited.length) checks.push({ id: 'allowlist', label: 'Allowlist', status: 'warn', detail: 'Allowlisted dApp, but the approval is unlimited' });
-  else checks.push({ id: 'allowlist', label: 'Allowlist', status: 'pass', detail: decoded.some((d) => d.kind === 'approve') ? `${ALLOWLIST.get((decoded.find((d) => d.kind === 'approve') as { spender: string }).spender.toLowerCase())} is allowlisted` : 'USDC and wallet settings only' });
-
-  // 2. Sanctions screen on every counterparty.
-  const counterparties = decoded.flatMap((d) => (d.kind === 'transfer' ? (isAddressEqual(d.to as Hex, treasury) ? [] : [d.to]) : d.kind === 'approve' ? [d.spender] : d.kind === 'unknown' ? [d.to] : []));
-  const hit = counterparties.map((a) => ({ a, list: screen(a) })).find((x) => x.list);
-  checks.push(hit
-    ? { id: 'sanctions', label: 'Sanctions screen', status: 'fail', detail: `${shortAddress(hit.a)} is on the ${hit.list}` }
-    : { id: 'sanctions', label: 'Sanctions screen', status: 'pass', detail: counterparties.length ? `${counterparties.length} counterpart${counterparties.length > 1 ? 'ies' : 'y'} screened, no match` : 'No counterparties' });
-
-  // 3. Simulation against the latest Base Sepolia state, from the wallet's own address.
-  const c = client(NODE_RPC);
-  const balanceBefore = await c.readContract({ address: USDC.address, abi: erc20Abi, functionName: 'balanceOf', args: [wallet.address as Hex] });
   const transfers = decoded.filter((d): d is Extract<DecodedCall, { kind: 'transfer' }> => d.kind === 'transfer');
   const feeTransfers = transfers.filter((t) => isAddressEqual(t.to as Hex, treasury));
   const fee = feeTransfers.reduce((s, t) => s + t.amount, 0n);
   const outgoing = transfers.reduce((s, t) => s + t.amount, 0n) - fee;
+  const security = decoded.every((d) => d.kind === 'security');
+  const unlimited = decoded.filter((d) => d.kind === 'approve' && d.amount >= UNLIMITED);
+  const largeApproval = decoded.some((d) => d.kind === 'approve' && d.amount >= STEP_UP_THRESHOLD);
+  const highValue = outgoing >= STEP_UP_THRESHOLD || largeApproval;
+  onProgress?.({ plan: [
+    { id: 'allowlist', label: 'Allowlist' },
+    { id: 'sanctions', label: 'Sanctions screen' },
+    { id: 'simulation', label: 'Simulation' },
+    ...(security ? [] : [{ id: 'fee', label: 'Service fee' } as const]),
+    ...(highValue ? [{ id: 'stepup', label: 'High-value check' } as const] : []),
+  ] });
+
+  // 1. Allowlist: only USDC, approved dApp spenders, and the wallet's own security settings.
+  const unknown = decoded.filter((d) => d.kind === 'unknown');
+  const badSpenders = decoded.filter((d) => d.kind === 'approve' && !ALLOWLIST.has(d.spender.toLowerCase()));
+  if (unknown.length) report({ id: 'allowlist', label: 'Allowlist', status: 'fail', detail: `Contract ${shortAddress((unknown[0] as { to: string }).to)} is not on Swissquote's allowlist` });
+  else if (badSpenders.length) report({ id: 'allowlist', label: 'Allowlist', status: 'fail', detail: `Approval to unverified contract ${shortAddress((badSpenders[0] as { spender: string }).spender)}` });
+  else if (unlimited.length) report({ id: 'allowlist', label: 'Allowlist', status: 'warn', detail: 'Allowlisted dApp, but the approval is unlimited' });
+  else report({ id: 'allowlist', label: 'Allowlist', status: 'pass', detail: decoded.some((d) => d.kind === 'approve') ? `${ALLOWLIST.get((decoded.find((d) => d.kind === 'approve') as { spender: string }).spender.toLowerCase())} is allowlisted` : 'USDC and wallet settings only' });
+
+  // 2. Sanctions screen on every counterparty.
+  const counterparties = decoded.flatMap((d) => (d.kind === 'transfer' ? (isAddressEqual(d.to as Hex, treasury) ? [] : [d.to]) : d.kind === 'approve' ? [d.spender] : d.kind === 'unknown' ? [d.to] : []));
+  const hit = counterparties.map((a) => ({ a, list: screen(a) })).find((x) => x.list);
+  report(hit
+    ? { id: 'sanctions', label: 'Sanctions screen', status: 'fail', detail: `${shortAddress(hit.a)} is on the ${hit.list}` }
+    : { id: 'sanctions', label: 'Sanctions screen', status: 'pass', detail: counterparties.length ? `${counterparties.length} counterpart${counterparties.length > 1 ? 'ies' : 'y'} screened, no match` : 'No counterparties' });
+
+  // 3. Service fee: value-moving operations pay a small USDC fee in the same batch. Security actions are free.
+  if (!security) {
+    report(fee >= SERVICE_FEE
+      ? { id: 'fee', label: 'Service fee', status: 'pass', detail: `${formatUsdc(fee)} USDC batched into this transaction` }
+      : { id: 'fee', label: 'Service fee', status: 'fail', detail: 'Sponsored transactions must include the service fee' });
+  }
+
+  // 4. Simulation against the latest Base Sepolia state, from the wallet's own address. The slow one: it reads the chain.
+  const c = client(NODE_RPC);
+  const balanceBefore = await c.readContract({ address: USDC.address, abi: erc20Abi, functionName: 'balanceOf', args: [wallet.address as Hex] });
   let simOk = balanceBefore >= outgoing + fee;
   let simDetail = simOk ? '' : `Balance ${formatUsdc(balanceBefore)} USDC is too low`;
   if (simOk) {
@@ -93,25 +115,17 @@ export async function evaluate(op: UserOperationV7, wallet: WalletRecord, stepUp
   }
   if (fee > 0n) effects.push({ label: 'Swissquote service fee, gas included', amount: fee, direction: 'out' });
   const balanceAfter = balanceBefore - outgoing - fee;
-  checks.push(simOk
+  report(simOk
     ? { id: 'simulation', label: 'Simulation', status: 'pass', detail: outgoing + fee > 0n ? `Balance ${formatUsdc(balanceBefore)} → ${formatUsdc(balanceAfter)} USDC` : 'No balance change' }
     : { id: 'simulation', label: 'Simulation', status: 'fail', detail: simDetail });
 
-  // 4. Service fee: value-moving operations pay a small USDC fee in the same batch. Security actions are free.
-  const security = decoded.every((d) => d.kind === 'security');
-  if (!security) {
-    checks.push(fee >= SERVICE_FEE
-      ? { id: 'fee', label: 'Service fee', status: 'pass', detail: `${formatUsdc(fee)} USDC batched into this transaction` }
-      : { id: 'fee', label: 'Service fee', status: 'fail', detail: 'Sponsored transactions must include the service fee' });
-  }
-
   // 5. High-value step-up: the client's recovery factor confirms large transfers and large approvals.
-  if (outgoing >= STEP_UP_THRESHOLD || largeApproval) {
+  if (highValue) {
     const verified = stepUpId && await read((db) => {
       const s = db.stepUps[stepUpId];
       return s && s.verified && s.wallet.toLowerCase() === wallet.address.toLowerCase() && s.callDataHash === keccak256(op.callData as Hex) && s.expires > Date.now();
     });
-    checks.push(verified
+    report(verified
       ? { id: 'stepup', label: 'High-value check', status: 'pass', detail: `Confirmed with your ${factorName(wallet.guardianB.type)}` }
       : { id: 'stepup', label: 'High-value check', status: 'required', detail: `${unlimited.length ? 'Unlimited approvals need' : largeApproval && outgoing < STEP_UP_THRESHOLD ? `Approvals above ${formatUsdc(STEP_UP_THRESHOLD)} USDC need` : `Above ${formatUsdc(STEP_UP_THRESHOLD)} USDC,`} your ${factorName(wallet.guardianB.type)} ${largeApproval && outgoing < STEP_UP_THRESHOLD ? 'too' : 'confirms too'}` });
   }
