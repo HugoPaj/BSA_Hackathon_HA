@@ -38,14 +38,10 @@ export async function POST(req: Request) {
 
   // Stream newline-delimited JSON: the planned checks, each check as it is decided, then the result.
   return new Response(new ReadableStream({
-    async start(controller) {
+    start(controller) {
+      // Not awaited: start() must return so the runtime can flush each line as it is sent.
       const send = (msg: unknown) => controller.enqueue(new TextEncoder().encode(stringify(msg) + '\n'));
-      try {
-        await run(send);
-      } catch (e) {
-        send({ error: (e as Error).message });
-      }
-      controller.close();
+      run(send).catch((e) => send({ error: (e as Error).message })).finally(() => controller.close());
     },
   }), { headers: { 'content-type': 'application/x-ndjson', 'cache-control': 'no-store' } });
 }
