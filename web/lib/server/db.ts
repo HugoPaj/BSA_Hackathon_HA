@@ -92,6 +92,7 @@ type DB = {
   audit: AuditEntry[];
   stepUps: Record<string, StepUp>;
   dnieRequests: Record<string, DnieRequest>;
+  keys?: { ops: `0x${string}` }; // database store only, the file store keeps .data/keys.json
 };
 
 const empty = (): DB => ({ sessions: {}, wallets: {}, recoveries: {}, alerts: [], activity: [], audit: [], stepUps: {}, dnieRequests: {} });

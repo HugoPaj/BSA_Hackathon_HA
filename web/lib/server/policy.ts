@@ -39,7 +39,7 @@ export function screen(address: string) {
 export async function evaluate(op: UserOperationV7, wallet: WalletRecord, stepUpId?: string): Promise<Evaluation> {
   const checks: Check[] = [];
   const effects: Effect[] = [];
-  const treasury = opsAddress();
+  const treasury = await opsAddress();
   let decoded: DecodedCall[];
   try {
     decoded = decodeCalls(op.callData).map((c) => classifyCall(c, wallet.address));

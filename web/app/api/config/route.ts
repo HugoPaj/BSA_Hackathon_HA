@@ -6,7 +6,7 @@ export async function GET() {
   try {
     // Guardian A: the 1-of-2 Safe of Swissquote's guardian HSM and the independent partner, deployed on first use.
     const { address } = await guardianSafe();
-    return json({ swissquoteGuardian: address, treasury: opsAddress() });
+    return json({ swissquoteGuardian: address, treasury: await opsAddress() });
   } catch (e) {
     return fail((e as Error).message, 503);
   }

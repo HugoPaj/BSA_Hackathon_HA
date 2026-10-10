@@ -19,16 +19,16 @@ export async function sponsor(op: UserOperationV7) {
   return userOperation as UserOperationV7;
 }
 
-const ops = () => (relayer ??= createRelayer({ key: opsSigner(), nodeRpc: NODE_RPC, bundlerRpc: BUNDLER_RPC, paymasterRpc: PAYMASTER_RPC, chainId: CHAIN_ID, sponsorshipPolicyId }));
+const ops = async () => (relayer ??= createRelayer({ key: await opsSigner(), nodeRpc: NODE_RPC, bundlerRpc: BUNDLER_RPC, paymasterRpc: PAYMASTER_RPC, chainId: CHAIN_ID, sponsorshipPolicyId }));
 let relayer: ReturnType<typeof createRelayer> | undefined;
 
-export function opsAddress() {
-  return ops().address;
+export async function opsAddress() {
+  return (await ops()).address;
 }
 
 /** Send transactions from Swissquote's operations Safe, gas-sponsored. */
-export function relay(txs: MetaTransaction[]) {
-  return ops().relay(txs);
+export async function relay(txs: MetaTransaction[]) {
+  return (await ops()).relay(txs);
 }
 
 export async function bundlerRequest(method: string, params: unknown[]) {

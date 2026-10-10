@@ -1,20 +1,23 @@
 import 'server-only';
 // Swissquote backend keys. Only the operations Safe's owner lives here. The recovery guardian key does not:
 // it belongs to the guardian service (services/guardian.ts), a separate process with its own storage.
-// Demo: software key from env (required on Vercel), or generated once into .data/keys.json.
+// Demo: software key from env, or generated once into the database (or .data/keys.json without one).
 import fs from 'node:fs';
 import path from 'node:path';
 import { generatePrivateKey } from 'viem/accounts';
 import type { Hex } from 'viem';
-import { DATA_DIR } from './db';
+import { DATA_DIR, write } from './db';
 
 type Keys = { ops: Hex };
 let cached: Keys | null = null;
 
-function loadKeys(): Keys {
+async function loadKeys(): Promise<Keys> {
   if (cached) return cached;
-  // Serverless instances each have their own disk, so a generated key would differ per instance.
-  if (process.env.VERCEL && !process.env.SQ_OPS_KEY) throw new Error('SQ_OPS_KEY is not set');
+  if (!process.env.SQ_OPS_KEY && process.env.DATABASE_URL) {
+    // Shared by every serverless instance: the first one to need it generates it.
+    cached = await write((db) => (db.keys ??= { ops: generatePrivateKey() }));
+    return cached;
+  }
   const file = path.join(DATA_DIR, 'keys.json');
   let fromFile: Partial<Keys> & { guardian?: Hex } = {};
   try { fromFile = JSON.parse(fs.readFileSync(file, 'utf8')); } catch {}
@@ -29,4 +32,4 @@ function loadKeys(): Keys {
 }
 
 /** Owner key of Swissquote's operations Safe (relayer, treasury and fee collector). Holds no client funds. */
-export const opsSigner = () => loadKeys().ops;
+export const opsSigner = async () => (await loadKeys()).ops;

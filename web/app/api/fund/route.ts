@@ -14,7 +14,7 @@ export async function POST(req: Request) {
   if (!wallet) return fail('Open a wallet first');
   const { amount } = await body<{ amount: bigint }>(req);
   if (amount <= 0n || amount > 20_000_000n) return fail('Choose an amount up to 20 USDC');
-  const treasury = opsAddress();
+  const treasury = await opsAddress();
   const balance = await rpc(NODE_RPC).readContract({ address: USDC.address, abi: erc20Abi, functionName: 'balanceOf', args: [treasury as Hex] });
   if (balance < amount) return fail(`The demo treasury holds only ${formatUsdc(balance)} USDC. Top it up at faucet.circle.com (Base Sepolia) to ${treasury}.`);
   try {

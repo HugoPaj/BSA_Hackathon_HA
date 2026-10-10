@@ -8,7 +8,7 @@ import { json } from '@/lib/server/session';
 
 // Swissquote operations view (mock). Shows what Swissquote can see and do, which is deliberately limited.
 export async function GET() {
-  const treasury = opsAddress();
+  const treasury = await opsAddress();
   const c = rpc(NODE_RPC);
   const [usdc, eth] = await Promise.all([
     c.readContract({ address: USDC.address, abi: erc20Abi, functionName: 'balanceOf', args: [treasury as Hex] }),
