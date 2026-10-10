@@ -5,12 +5,13 @@ import { cn } from '@/utils/cn';
  * Full-bleed split screen for the logged-out home and the recovery flow: engraved artwork on the left, optionally with copy
  * over its darkened foot, the form on white to the right. On mobile the art becomes a banner above the form.
  */
-export function SplitScreen({ image, art, children, bannerClassName }: {
+export function SplitScreen({ image, art, children, bannerClassName, contentClassName }: {
   image: string;
   /** Copy laid over the image's darkened foot. Without it the artwork shows untouched. */
   art?: React.ReactNode;
   children: React.ReactNode;
   bannerClassName?: string;
+  contentClassName?: string;
 }) {
   return (
     <div className="grid flex-1 content-start bg-bg-white-0 lg:content-stretch lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
@@ -27,12 +28,12 @@ export function SplitScreen({ image, art, children, bannerClassName }: {
           </>}
         </div>
       </section>
-      <section className="flex flex-col px-5 pb-10 pt-8 sm:px-10 lg:py-6">{children}</section>
+      <section className={cn('flex flex-col px-5 pb-10 pt-8 sm:px-10 lg:py-6', contentClassName)}>{children}</section>
     </div>
   );
 }
 
 /** The bold uppercase display headline that sits on the artwork. */
 export function SplitHeadline({ children }: { children: React.ReactNode }) {
-  return <h1 className="sq-display animate-fade-in-up text-[40px] md:text-[56px] xl:text-[72px]">{children}</h1>;
+  return <h1 className="sq-display animate-fade-in-up text-[clamp(28px,8.2vw,40px)] md:text-[56px] xl:text-[72px]">{children}</h1>;
 }

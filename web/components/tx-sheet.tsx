@@ -59,7 +59,6 @@ export function TxSheet({ open, onOpenChange, flow, title, headline, txs, guardi
       ) : (
         <div className="space-y-4">
           {headline}
-          {(evaluation || phase !== 'error') && <ChecksList evaluation={evaluation} plan={flow.plan} checks={flow.checks} checking={flow.checking} />}
 
           {evaluation && (
             <div className="divide-y divide-stroke-soft-200 rounded-xl ring-1 ring-inset ring-stroke-soft-200">
@@ -83,6 +82,8 @@ export function TxSheet({ open, onOpenChange, flow, title, headline, txs, guardi
               )}
             </div>
           )}
+
+          {(evaluation || phase !== 'error') && <ChecksList evaluation={evaluation} plan={flow.plan} checks={flow.checks} checking={flow.checking} collapsePassed />}
 
           {phase === 'declined' && evaluation && (
             <Alert.Root status="error" variant="lighter" size="small">

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { QRCodeSVG } from 'qrcode.react';
 import {
-  RiBankLine, RiCheckLine, RiFileCopyLine, RiFingerprintLine, RiKey2Line, RiMacbookLine, RiShieldCheckFill, RiShieldKeyholeLine,
+  RiArrowDownSLine, RiBankLine, RiCheckLine, RiFileCopyLine, RiFingerprintLine, RiKey2Line, RiMacbookLine, RiShieldCheckFill, RiShieldKeyholeLine,
   RiTimeLine, RiUserHeartLine, RiCheckboxCircleFill, RiArrowRightLine, RiIdCardLine, RiQrCodeLine,
 } from '@remixicon/react';
 import * as FancyButton from '@/components/ui/fancy-button';
@@ -50,7 +50,7 @@ function Onboarding() {
     <div className="mx-auto max-w-[560px]">
       {step !== 'intro' && (
         <div className="mb-6">
-          <div className="mb-2 flex justify-between text-label-xs text-text-sub-600"><span>Step {idx} of {STEPS.length - 1}</span><span>{['', 'Your passkey', 'Recovery factor', 'Recovery settings', 'Create wallet', 'Ownership proof'][idx]}</span></div>
+          <div className="mb-2 flex justify-between text-label-xs text-text-sub-600"><span>Step {idx} of {STEPS.length - 1}</span><span>{['', 'Your passkey', 'Your backup method', 'Recovery settings', 'Create wallet', 'Ownership proof'][idx]}</span></div>
           <ProgressBar.Root value={idx} max={STEPS.length - 1} />
         </div>
       )}
@@ -70,6 +70,17 @@ function Card({ children, className }: { children: React.ReactNode; className?: 
   return <div className={cn('rounded-3xl bg-bg-white-0 p-6 shadow-regular-xs ring-1 ring-inset ring-stroke-soft-200 md:p-8', className)}>{children}</div>;
 }
 
+function TechnicalDetails({ children, title = 'How it works' }: { children: React.ReactNode; title?: string }) {
+  return (
+    <details className="group rounded-xl bg-bg-weak-50">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-xl px-4 py-3 text-label-sm text-text-sub-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-base [&::-webkit-details-marker]:hidden">
+        {title}<RiArrowDownSLine className="size-5 shrink-0 transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="space-y-2 px-4 pb-4 text-paragraph-sm text-text-sub-600">{children}</div>
+    </details>
+  );
+}
+
 function Intro({ onNext }: { onNext: () => void }) {
   return (
     <div className="space-y-6">
@@ -79,9 +90,9 @@ function Intro({ onNext }: { onNext: () => void }) {
       </div>
       <Card className="space-y-5">
         {[
-          { icon: RiFingerprintLine, t: 'Your passkey is the only key that can spend', d: 'It is created on this device and protected by Face ID, Touch ID, Windows Hello or your PIN. Swissquote never sees it and holds no key that can move your funds.' },
-          { icon: RiShieldKeyholeLine, t: 'Recovery needs you and Swissquote together', d: 'If you lose your device, your own recovery factor and Swissquote (after a face check against your ID) can replace the passkey. Neither can do it alone.' },
-          { icon: RiTimeLine, t: 'Every recovery waits, and you can stop it', d: `A safety delay (${RECOVERY_DELAY_PRODUCTION} in production, ${RECOVERY_DELAY_LABEL} in this demo) runs with alerts on every channel. Any device with your passkey can cancel.` },
+          { icon: RiFingerprintLine, t: 'Approve payments with your passkey', d: 'Use Face ID, Touch ID, Windows Hello or your device PIN. Only your passkey can approve payments; Swissquote cannot move your money.' },
+          { icon: RiShieldKeyholeLine, t: 'Choose a backup for lost-device recovery', d: 'If you lose access, you will need your backup method and approval from Swissquote after an identity check. Neither can recover the wallet alone.' },
+          { icon: RiTimeLine, t: 'Recovery waits, and you can cancel it', d: `A safety delay of ${RECOVERY_DELAY_PRODUCTION} (${RECOVERY_DELAY_LABEL} in this demo) gives you time to respond to alerts. Cancel using a device with your original passkey.` },
         ].map((f) => (
           <div key={f.t} className="flex gap-4">
             <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary-alpha-10 text-primary-base"><f.icon className="size-5" /></span>
@@ -103,13 +114,13 @@ function PasskeyStep({ owner, setOwner, onNext }: { owner: Passkey | null; setOw
     <Card className="space-y-5">
       <div>
         <h2 className="text-title-h5 text-text-strong-950">Create your wallet passkey</h2>
-        <p className="mt-1 text-paragraph-sm text-text-sub-600">Your device generates a P-256 key in its secure hardware. It never leaves the device (or your encrypted iCloud / Google password manager, if you sync passkeys). No seed phrase to write down.</p>
+        <p className="mt-1 text-paragraph-sm text-text-sub-600">Use Face ID, Touch ID, Windows Hello or your device PIN to approve payments. Save this passkey on your everyday device. No seed phrase to write down.</p>
       </div>
       {!passkeysSupported() && <Alert.Root status="error" variant="lighter" size="small"><Alert.Icon />This browser does not support passkeys.</Alert.Root>}
       {owner ? (
         <div className="space-y-3 rounded-2xl bg-success-lighter p-4">
           <div className="flex items-center gap-2 text-label-sm text-success-base"><RiCheckboxCircleFill className="size-5" />Passkey created</div>
-          <div className="text-paragraph-sm text-text-strong-950">Your wallet address will be <span className="font-mono text-paragraph-xs">{shortAddress(address)}</span>. It is computed from your passkey, so it exists before anything is deployed.</div>
+          <div className="text-paragraph-sm text-text-strong-950">Next, choose a separate backup method in case you lose access to this passkey.</div>
         </div>
       ) : (
         <FancyButton.Root variant="primary" className="h-12 w-full" disabled={busy || !passkeysSupported()} onClick={async () => {
@@ -121,13 +132,17 @@ function PasskeyStep({ owner, setOwner, onNext }: { owner: Passkey | null; setOw
       )}
       {error && <Alert.Root status="error" variant="lighter" size="small"><Alert.Icon />{error}</Alert.Root>}
       {owner && <Button.Root className="h-11 w-full" onClick={onNext}>Continue<Button.Icon as={RiArrowRightLine} /></Button.Root>}
+      <TechnicalDetails>
+        <p>Your device creates a P-256 signing key. It stays in secure hardware, or syncs through your encrypted iCloud or Google password manager if you use synced passkeys. Swissquote never receives the private key.</p>
+        {address && <p>Your wallet address is <span className="font-mono text-paragraph-xs">{shortAddress(address)}</span>, calculated from your passkey before the wallet is created on-chain.</p>}
+      </TechnicalDetails>
     </Card>
   );
 }
 
 function FactorStep({ wallet, factor, setFactor, onNext }: { wallet: string; factor: Factor; setFactor: (f: Factor) => void; onNext: () => void }) {
   const { client } = useSession();
-  const [choice, setChoice] = useState<'dnie' | 'passkey' | 'card'>('dnie');
+  const [choice, setChoice] = useState<'dnie' | 'passkey' | 'card'>('passkey');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pin, setPin] = useState('');
@@ -138,17 +153,17 @@ function FactorStep({ wallet, factor, setFactor, onNext }: { wallet: string; fac
   return (
     <Card className="space-y-5">
       <div>
-        <h2 className="text-title-h5 text-text-strong-950">Add your recovery factor</h2>
-        <p className="mt-1 text-paragraph-sm text-text-sub-600">This is <b>Guardian B</b>: something only you have, kept away from this device. Recovery always needs it, so a thief with your phone and e-mail still cannot take over the wallet. It can never spend.</p>
+        <h2 className="text-title-h5 text-text-strong-950">Choose a backup method</h2>
+        <p className="mt-1 text-paragraph-sm text-text-sub-600">If you lose access to your wallet, use this together with Swissquote to recover it. Keep it separate from your everyday device. Your backup cannot make payments.</p>
       </div>
       {!factor && (
         <div className="grid gap-3 sm:grid-cols-3">
           {([
-            { id: 'dnie', icon: RiIdCardLine, t: 'Your ID card', d: 'Tap your ID card on an Android phone, PIN-protected', tag: 'No extra device' },
             { id: 'passkey', icon: RiMacbookLine, t: 'Passkey on another device', d: 'Your laptop, a second phone or a security key', tag: 'Recommended' },
+            { id: 'dnie', icon: RiIdCardLine, t: 'Your ID card', d: 'Tap your ID card on an Android phone, PIN-protected', tag: 'No extra device' },
             { id: 'card', icon: RiQrCodeLine, t: 'Recovery card', d: 'A printable code locked with a 6-digit PIN', tag: 'Offline' },
           ] as const).map((o) => (
-            <button key={o.id} onClick={() => setChoice(o.id)} className={cn('rounded-2xl p-4 text-left ring-1 ring-inset transition active:scale-[0.98]', choice === o.id ? 'bg-primary-alpha-10 ring-primary-base' : 'bg-bg-white-0 ring-stroke-soft-200 hover:bg-bg-weak-50')}>
+            <button key={o.id} aria-pressed={choice === o.id} onClick={() => setChoice(o.id)} className={cn('rounded-2xl p-4 text-left ring-1 ring-inset transition active:scale-[0.98]', choice === o.id ? 'bg-primary-alpha-10 ring-primary-base' : 'bg-bg-white-0 ring-stroke-soft-200 hover:bg-bg-weak-50')}>
               <div className="flex items-center justify-between"><o.icon className={cn('size-6', choice === o.id ? 'text-primary-base' : 'text-text-sub-600')} /><span className="text-label-xs text-text-soft-400">{o.tag}</span></div>
               <div className="mt-3 text-label-sm text-text-strong-950">{o.t}</div>
               <div className="text-paragraph-xs text-text-sub-600">{o.d}</div>
@@ -165,7 +180,7 @@ function FactorStep({ wallet, factor, setFactor, onNext }: { wallet: string; fac
             const card = r.card!;
             setFactor({ type: 'dnie', enrollId: r.id, address: rsaGuardianAddress(wallet, card), ...card, label: card.simulated ? `Simulated ID (${card.holder})` : `ID card of ${card.holder}` });
           }}
-          intro={<p className="text-paragraph-sm text-text-sub-600">Your ID card&apos;s signature key (the one you sign official documents with) becomes Guardian B. Its PIN protects it, the issuing authority replaces it if you lose it, and only its public key goes on-chain, in a small guardian contract.</p>}
+          intro={<p className="text-paragraph-sm text-text-sub-600">Use your ID card and its PIN to confirm a recovery. You will need an Android phone with the Swissquote ID app to read the card.</p>}
         />
       )}
 
@@ -201,7 +216,7 @@ function FactorStep({ wallet, factor, setFactor, onNext }: { wallet: string; fac
             <div className="mt-4 flex gap-4">
               <div className="rounded-lg bg-static-white p-2"><QRCodeSVG value={card.code} size={112} /></div>
               <div className="min-w-0 flex-1 space-y-2">
-                <div className="text-paragraph-xs text-static-white/70">Guardian address</div>
+                <div className="text-paragraph-xs text-static-white/70">Backup address</div>
                 <div className="break-all font-mono text-[11px]">{card.address}</div>
                 <div className="text-paragraph-xs text-static-white/70">Locked with your PIN. Shown once, never stored by Swissquote.</div>
               </div>
@@ -220,11 +235,16 @@ function FactorStep({ wallet, factor, setFactor, onNext }: { wallet: string; fac
       {factor && (
         <div className="flex items-center gap-3 rounded-2xl bg-success-lighter p-4">
           <RiCheckboxCircleFill className="size-6 shrink-0 text-success-base" />
-          <div className="min-w-0"><div className="text-label-sm text-text-strong-950">{factor.label} added</div>{factor.type === 'dnie' && <div className="text-paragraph-xs text-text-sub-600">{factor.documentId} · {factor.issuer} · PIN verified</div>}<div className="truncate font-mono text-paragraph-xs text-text-sub-600">Guardian {factor.type === 'dnie' ? 'contract' : 'address'} {shortAddress(factor.address)}</div></div>
+          <div className="min-w-0"><div className="text-label-sm text-text-strong-950">{factor.label} added</div>{factor.type === 'dnie' && <div className="text-paragraph-xs text-text-sub-600">{factor.documentId} · {factor.issuer} · PIN verified</div>}<div className="text-paragraph-xs text-text-sub-600">Your backup is ready for lost-device recovery.</div></div>
         </div>
       )}
       {error && <Alert.Root status="error" variant="lighter" size="small"><Alert.Icon />{error}</Alert.Root>}
       {factor && <Button.Root className="h-11 w-full" onClick={onNext}>Continue<Button.Icon as={RiArrowRightLine} /></Button.Root>}
+      <TechnicalDetails title="How recovery works">
+        <p>Your backup is registered as Guardian B. Recovery needs approval from both your backup and Swissquote (Guardian A), followed by a safety delay of {RECOVERY_DELAY_PRODUCTION} ({RECOVERY_DELAY_LABEL} in this demo). Your original passkey can cancel during the delay. Neither guardian can make payments.</p>
+        {choice === 'dnie' && <p>Your ID card uses its signature key to approve recovery. Its PIN protects the key; only the public key is registered in an on-chain guardian contract. If you lose the card, its issuing authority handles replacement.</p>}
+        {factor && <p>Backup {factor.type === 'dnie' ? 'contract' : 'address'}: <span className="font-mono text-paragraph-xs">{shortAddress(factor.address)}</span>.</p>}
+      </TechnicalDetails>
     </Card>
   );
 }
@@ -235,26 +255,26 @@ function SettingsStep({ bankAssisted, setBankAssisted, contact, setContact, fact
     <Card className="space-y-5">
       <div>
         <h2 className="text-title-h5 text-text-strong-950">Recovery settings</h2>
-        <p className="mt-1 text-paragraph-sm text-text-sub-600">Two guardians, both required, then a delay you can cancel.</p>
+        <p className="mt-1 text-paragraph-sm text-text-sub-600">Both approvals below are needed to recover your wallet. Neither can make payments.</p>
       </div>
       <div className="grid items-stretch gap-3 sm:grid-cols-[1fr_auto_1fr]">
         <div className="rounded-2xl bg-bg-weak-50 p-4">
-          <div className="text-subheading-2xs uppercase tracking-wider text-text-soft-400">Guardian A</div>
+          <div className="text-subheading-2xs uppercase tracking-wider text-text-soft-400">Recovery support</div>
           <div className="mt-2 flex items-center gap-2 text-label-sm text-text-strong-950">{bankAssisted ? <RiBankLine className="size-5 text-primary-base" /> : <RiUserHeartLine className="size-5 text-primary-base" />}{bankAssisted ? 'Swissquote' : 'Trusted contact'}</div>
           <div className="mt-1 text-paragraph-xs text-text-sub-600">{bankAssisted ? 'Approves only after e-banking login and a live face match against your ID. If Swissquote is ever unavailable, an independent partner can approve in its place.' : 'Someone you trust approves from their own wallet.'}</div>
         </div>
         <div className="grid place-items-center text-label-sm text-text-soft-400">AND</div>
         <div className="rounded-2xl bg-bg-weak-50 p-4">
-          <div className="text-subheading-2xs uppercase tracking-wider text-text-soft-400">Guardian B</div>
+          <div className="text-subheading-2xs uppercase tracking-wider text-text-soft-400">Your backup method</div>
           <div className="mt-2 flex items-center gap-2 text-label-sm text-text-strong-950">{factor.type === 'passkey' ? <RiMacbookLine className="size-5 text-primary-base" /> : factor.type === 'dnie' ? <RiIdCardLine className="size-5 text-primary-base" /> : <RiQrCodeLine className="size-5 text-primary-base" />}{factor.label}</div>
           <div className="mt-1 text-paragraph-xs text-text-sub-600">Something only you have.</div>
         </div>
       </div>
-      <div className="flex items-center gap-2 rounded-2xl bg-warning-lighter p-4 text-paragraph-sm text-text-strong-950"><RiTimeLine className="size-5 shrink-0 text-warning-dark" />Then a safety delay of {RECOVERY_DELAY_PRODUCTION} ({RECOVERY_DELAY_LABEL} in this demo). Your passkey can cancel at any time.</div>
+      <div className="flex items-center gap-2 rounded-2xl bg-warning-lighter p-4 text-paragraph-sm text-text-strong-950"><RiTimeLine className="size-5 shrink-0 text-warning-dark" />Then a safety delay of {RECOVERY_DELAY_PRODUCTION} ({RECOVERY_DELAY_LABEL} in this demo). Cancel during the delay using your original passkey.</div>
       <div className="flex items-start justify-between gap-4 rounded-2xl p-4 ring-1 ring-inset ring-stroke-soft-200">
         <div>
           <div className="text-label-sm text-text-strong-950">Bank-assisted recovery</div>
-          <div className="mt-1 text-paragraph-xs text-text-sub-600">On by default. Switch it off for zero bank involvement: a trusted contact takes Swissquote&apos;s place as Guardian A.</div>
+          <div className="mt-1 text-paragraph-xs text-text-sub-600">Swissquote helps verify your identity. Switch this off to choose a trusted contact instead. Your backup method is still required.</div>
         </div>
         <Switch.Root checked={bankAssisted} onCheckedChange={setBankAssisted} />
       </div>
@@ -262,7 +282,7 @@ function SettingsStep({ bankAssisted, setBankAssisted, contact, setContact, fact
         <div className="space-y-2">
           <div className="text-label-sm text-text-strong-950">Trusted contact&apos;s wallet address</div>
           <Input.Root hasError={!!contact && !contactOk}><Input.Wrapper><Input.Input placeholder="0x…" value={contact} onChange={(e) => setContact(e.target.value.trim())} className="font-mono" /></Input.Wrapper></Input.Root>
-          <p className="text-paragraph-xs text-text-soft-400">The recovery screens in this demo cover bank-assisted recovery. With a trusted contact, they approve the same EIP-712 request from their own wallet.</p>
+          <p className="text-paragraph-xs text-text-soft-400">This demo&apos;s recovery screens support Swissquote-assisted recovery. The trusted-contact recovery flow is not available here.</p>
         </div>
       )}
       <Button.Root className="h-11 w-full" disabled={!bankAssisted && !contactOk} onClick={onNext}>Continue<Button.Icon as={RiArrowRightLine} /></Button.Root>
@@ -304,15 +324,16 @@ function CreateStep({ owner, factor, bankAssisted, contact, onNext }: { owner: P
     <Card className="space-y-5">
       <div>
         <h2 className="text-title-h5 text-text-strong-950">Create your wallet</h2>
-        <p className="mt-1 text-paragraph-sm text-text-sub-600">One transaction deploys your Safe smart account, makes your passkey its only owner and switches recovery on, so the wallet is never unprotected. Swissquote pays the gas.</p>
+        <p className="mt-1 text-paragraph-sm text-text-sub-600">Create your wallet with passkey payments and recovery already set up. Only you can approve payments. Swissquote pays the network fee.</p>
       </div>
       <div className="divide-y divide-stroke-soft-200 rounded-xl ring-1 ring-inset ring-stroke-soft-200">
         {[
           ['Wallet address', <span key="a" className="font-mono text-paragraph-xs">{shortAddress(address)}</span>],
-          ['Owner', 'Your passkey (signer contract)'],
-          ['Guardian A', bankAssisted ? 'Swissquote' : 'Trusted contact'],
-          ['Guardian B', factor.label],
-          ['Recovery threshold', '2 of 2, then delay'],
+          ['Payment approval', 'Your passkey'],
+          ['Recovery support', bankAssisted ? 'Swissquote' : 'Trusted contact'],
+          ['Backup method', factor.label],
+          ['Recovery approvals', 'Both required'],
+          ['Safety delay', `${RECOVERY_DELAY_LABEL} in this demo`],
         ].map(([k, v]) => (
           <div key={k as string} className="flex items-center justify-between gap-3 px-3 py-2.5 text-paragraph-sm"><span className="text-text-sub-600">{k}</span><span className="text-right text-label-sm text-text-strong-950">{v}</span></div>
         ))}
@@ -336,6 +357,9 @@ function CreateStep({ owner, factor, bankAssisted, contact, onNext }: { owner: P
           {flow.phase === 'signing' ? 'Approve with your passkey…' : flow.phase === 'submitting' || flow.phase === 'confirming' ? 'Deploying…' : failed ? 'Try again' : 'Create wallet'}
         </FancyButton.Root>
       )}
+      <TechnicalDetails>
+        <p>A single transaction deploys your Safe smart account, makes your passkey signer contract its only owner and enables recovery. Your recovery support and backup are registered as Guardian A and Guardian B; both approvals are required.</p>
+      </TechnicalDetails>
     </Card>
   );
 }
@@ -350,7 +374,7 @@ function ProofStep({ owner }: { owner: Passkey }) {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-title-h5 text-text-strong-950">Prove ownership to Swissquote</h2>
-          <p className="mt-1 text-paragraph-sm text-text-sub-600">Swiss rules (FINMA Guidance 02/2019) require proof that a self-hosted wallet belongs to you before Swissquote sends funds to it. Your passkey signs a challenge and Swissquote checks it on-chain through your wallet&apos;s signer contract (EIP-1271). No screenshots, no test transfers.</p>
+          <p className="mt-1 text-paragraph-sm text-text-sub-600">Confirm with your passkey that this wallet belongs to you, so you can add money from your Swissquote account. This does not send money or give Swissquote access to your funds.</p>
         </div>
         <MockTag>Compliance</MockTag>
       </div>
@@ -376,6 +400,9 @@ function ProofStep({ owner }: { owner: Passkey }) {
         </>
       )}
       {error && <Alert.Root status="error" variant="lighter" size="small"><Alert.Icon />{error}</Alert.Root>}
+      <TechnicalDetails>
+        <p>Your passkey signs an ownership challenge. Swissquote verifies it on-chain through your wallet&apos;s signer contract (EIP-1271) and archives the proof. This supports wallet ownership verification under FINMA Guidance 02/2019, without screenshots or test transfers.</p>
+      </TechnicalDetails>
     </Card>
   );
 }

@@ -40,28 +40,30 @@ function Landing() {
   return (
     <SplitScreen
       image="/landing/hero.webp"
+      bannerClassName="h-[clamp(112px,20dvh,180px)] sm:h-[440px]"
+      contentClassName="pt-4 sm:pt-8"
       art={<SplitHeadline>Your keys.<br /><span className="text-primary-base">Your control.</span></SplitHeadline>}
     >
       <div className="m-auto w-full max-w-[400px] animate-fade-in-up">
         <div className="text-center">
-          <SqMark className="mx-auto size-10" />
-          <h2 className="mt-5 text-title-h4 text-text-strong-950">{copy.title}</h2>
+          <SqMark className="mx-auto hidden size-10 sm:block" />
+          <h2 className="text-title-h4 text-text-strong-950 sm:mt-5">{copy.title}</h2>
           <p className="mx-auto mt-2 max-w-[340px] text-paragraph-sm text-text-sub-600">{copy.sub}</p>
         </div>
-        <SegmentedControl.Root value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="mt-7">
+        <SegmentedControl.Root value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="mt-4 sm:mt-7">
           <SegmentedControl.List>
             <SegmentedControl.Trigger value="signin" className="h-8">Log in</SegmentedControl.Trigger>
             <SegmentedControl.Trigger value="recover" className="h-8">Recover access</SegmentedControl.Trigger>
           </SegmentedControl.List>
-          <SegmentedControl.Content value="signin" className="mt-6 animate-fade-in-up outline-none">
+          <SegmentedControl.Content value="signin" className="mt-3 animate-fade-in-up outline-none sm:mt-6">
             <LoginForm />
           </SegmentedControl.Content>
-          <SegmentedControl.Content value="recover" className="mt-6 animate-fade-in-up outline-none">
+          <SegmentedControl.Content value="recover" className="mt-3 animate-fade-in-up outline-none sm:mt-6">
             <RecoverPanel />
           </SegmentedControl.Content>
         </SegmentedControl.Root>
       </div>
-      <div className="mt-10 flex items-center justify-center gap-2 text-paragraph-xs text-text-soft-400">
+      <div className="mt-6 flex items-center justify-center gap-2 text-paragraph-xs text-text-soft-400 sm:mt-10">
         <SwissFlag className="size-3" /> Swiss bank, self-custody wallet
       </div>
     </SplitScreen>
