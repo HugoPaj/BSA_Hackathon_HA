@@ -137,9 +137,9 @@ export function TxSheet({ open, onOpenChange, flow, title, headline, txs, guardi
   );
 }
 
+// No line while preparing: the checks list above already shows Swissquote's progress.
 function StatusLine({ phase, stepUp, guardianType }: { phase: string; stepUp: boolean; guardianType: string }) {
   const text: Record<string, string> = {
-    preparing: 'Swissquote is checking this transaction…',
     stepup: guardianType === 'dnie' ? 'Checking your ID card confirmation…' : `Confirm on your ${guardianType === 'passkey' ? 'recovery device (choose “use another device” if asked)' : 'recovery card'}…`,
     signing: 'Approve with your passkey…',
     submitting: 'Sending to the network…',

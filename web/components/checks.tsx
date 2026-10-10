@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { RiArrowDownSLine, RiCheckboxBlankCircleLine, RiCheckboxCircleFill, RiCloseCircleFill, RiErrorWarningFill, RiShieldKeyholeFill, RiLoader4Line } from '@remixicon/react';
+import { RiArrowDownSLine, RiCheckboxCircleFill, RiCloseCircleFill, RiErrorWarningFill, RiShieldKeyholeFill, RiLoader4Line } from '@remixicon/react';
 import type { Evaluation } from '@/lib/wallet-client';
 import type { Check, PlannedCheck } from '@/lib/server/policy';
 import { cn } from '@/utils/cn';
@@ -20,8 +20,8 @@ const REVEAL_GAP_MS = 150;
 const resultKey = (c: Check) => `${c.id}|${c.status}|${c.detail}`;
 
 /**
- * Swissquote's sponsorship checks. Rows are queued while the browser builds the transaction, spin once Swissquote has
- * it (`checking`), and show each result as soon as the server streams it (`checks`). `evaluation` is the final word.
+ * Swissquote's sponsorship checks. Rows spin from the moment the browser starts building the transaction and show each
+ * result as soon as the server streams it (`checks`). `evaluation` is the final word.
  */
 export function ChecksList({ evaluation, plan, checks = [], checking = false, collapsePassed = false }: { evaluation?: Evaluation | null; plan?: PlannedCheck[] | null; checks?: Check[]; checking?: boolean; collapsePassed?: boolean }) {
   const decided = evaluation?.checks ?? checks;
@@ -38,9 +38,8 @@ export function ChecksList({ evaluation, plan, checks = [], checking = false, co
     return () => clearTimeout(t);
   }, [decided, revealed]);
 
-  const running = !!plan || checking;
   const allShown = rows.every((row) => decided.some((d) => d.id === row.id && revealed.includes(resultKey(d))));
-  const status = evaluation ? null : !running ? 'Preparing your transaction…' : allShown && checking ? 'Checks passed. Swissquote is sponsoring the gas…' : null;
+  const status = !evaluation && allShown && checking ? 'Checks passed. Swissquote is sponsoring the gas…' : null;
 
   if (collapsePassed && evaluation) {
     const passed = evaluation.checks.filter((c) => c.status === 'pass');
@@ -71,8 +70,8 @@ export function ChecksList({ evaluation, plan, checks = [], checking = false, co
         if (!c) {
           return (
             <div key={row.id} className="flex items-center gap-3 rounded-xl bg-bg-weak-50 px-3 py-2.5">
-              {running ? <RiLoader4Line className="size-5 animate-spin text-text-soft-400" /> : <RiCheckboxBlankCircleLine className="size-5 text-text-disabled-300" />}
-              <span className={cn('text-label-sm', running ? 'text-text-sub-600' : 'text-text-soft-400')}>{row.label}</span>
+              <RiLoader4Line className="size-5 animate-spin text-text-soft-400" />
+              <span className="text-label-sm text-text-sub-600">{row.label}</span>
             </div>
           );
         }
