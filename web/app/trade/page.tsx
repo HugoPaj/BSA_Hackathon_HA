@@ -87,7 +87,7 @@ function Markets({ s, cat, onCat }: { s: MarketState; cat: (typeof CATS)[number]
     <div className="space-y-4">
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:px-0">
         {CATS.map((c) => (
-          <button key={c.id} onClick={() => onCat(c.id)} className={cn('h-8 shrink-0 rounded-full px-4 text-label-sm transition-colors', c.id === cat.id ? 'bg-bg-strong-950 text-static-white' : 'bg-bg-white-0 text-text-sub-600 ring-1 ring-inset ring-stroke-soft-200 hover:bg-bg-weak-50')}>
+          <button key={c.id} onClick={() => onCat(c.id)} className={cn('h-8 shrink-0 rounded-full px-4 text-label-sm transition active:scale-[0.97]', c.id === cat.id ? 'bg-bg-strong-950 text-static-white' : 'bg-bg-white-0 text-text-sub-600 ring-1 ring-inset ring-stroke-soft-200 hover:bg-bg-weak-50')}>
             {c.label}
           </button>
         ))}
@@ -137,7 +137,7 @@ function PortfolioTab({ s }: { s: MarketState }) {
       {[false, true].map((crypto) => group(crypto).length > 0 && (
         <Card key={String(crypto)} title={crypto ? 'Crypto' : 'Shares'} right={<span className="text-label-sm tabular-nums text-text-sub-600">{formatNumber(crypto ? v.crypto : v.assets)} CHF</span>}>
           {group(crypto).map(({ h, i, price, value, pl, plPct }) => (
-            <Link key={h.symbol} href={`/trade/${i.symbol}`} className="-mx-2 flex items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-bg-weak-50">
+            <Link key={h.symbol} href={`/trade/${i.symbol}`} className="-mx-2 flex items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-bg-weak-50 active:bg-bg-weak-50">
               <InstrumentLogo i={i} />
               <div className="min-w-0 flex-1">
                 <div className="text-label-md text-text-strong-950">{i.symbol}</div>
@@ -170,10 +170,10 @@ function AccountSummary({ s }: { s: MarketState }) {
         <span className="tabular-nums text-text-strong-950">{formatNumber(v.buyingPower)} CHF</span>
       </div>
       <div className="mt-4 grid grid-cols-2 gap-2">
-        <Link href="/trade/orders" className="flex items-center gap-2 rounded-xl bg-bg-weak-50 px-3 py-2.5 text-label-sm text-text-strong-950 hover:bg-bg-soft-200">
+        <Link href="/trade/orders" className="flex items-center gap-2 rounded-xl bg-bg-weak-50 px-3 py-2.5 text-label-sm text-text-strong-950 transition hover:bg-bg-soft-200 active:scale-[0.97]">
           <RiArrowLeftRightLine className="size-4 text-primary-base" />Orders{open > 0 && <span className="ml-auto text-text-soft-400">{open}</span>}
         </Link>
-        <Link href="/trade/orders?tab=transactions" className="flex items-center gap-2 rounded-xl bg-bg-weak-50 px-3 py-2.5 text-label-sm text-text-strong-950 hover:bg-bg-soft-200">
+        <Link href="/trade/orders?tab=transactions" className="flex items-center gap-2 rounded-xl bg-bg-weak-50 px-3 py-2.5 text-label-sm text-text-strong-950 transition hover:bg-bg-soft-200 active:scale-[0.97]">
           <RiListUnordered className="size-4 text-primary-base" />History
         </Link>
       </div>

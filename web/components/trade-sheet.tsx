@@ -110,7 +110,7 @@ export function TradeSheet({ i, side: initialSide, open, onOpenChange }: { i: In
           )}
           <div className="flex flex-wrap gap-1.5">
             {(side === 'sell' && held > 0 ? [0.25, 0.5, 1].map((f) => ({ l: f === 1 ? 'All' : `${f * 100}%`, q: +(held * f).toFixed(6) })) : [1, 5, 10].map((n) => ({ l: formatQty(n * step), q: n * step }))).map((o) => (
-              <button key={o.l} onClick={() => setQty(String(o.q))} className="h-7 rounded-full bg-bg-weak-50 px-3 text-label-xs text-text-sub-600 hover:bg-bg-soft-200">{o.l}</button>
+              <button key={o.l} onClick={() => setQty(String(o.q))} className="h-7 rounded-full bg-bg-weak-50 px-3 text-label-xs text-text-sub-600 transition hover:bg-bg-soft-200 active:scale-[0.97]">{o.l}</button>
             ))}
           </div>
 

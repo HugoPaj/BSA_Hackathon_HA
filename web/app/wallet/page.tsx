@@ -160,7 +160,7 @@ function CopyAddress({ address }: { address: string }) {
     <button
       onClick={() => { navigator.clipboard.writeText(address); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
       title="Copy wallet address"
-      className="flex items-center gap-1.5 rounded-full bg-bg-weak-50 py-1 pl-3 pr-2.5 text-paragraph-xs text-text-sub-600 transition-colors hover:bg-bg-soft-200"
+      className="flex items-center gap-1.5 rounded-full bg-bg-weak-50 py-1 pl-3 pr-2.5 text-paragraph-xs text-text-sub-600 transition hover:bg-bg-soft-200 active:scale-[0.97]"
     >
       <span className="font-mono">{shortAddress(address)}</span>
       {copied ? <RiCheckLine className="size-3.5 text-success-base" /> : <RiFileCopyLine className="size-3.5" />}

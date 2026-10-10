@@ -34,7 +34,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               {NAV.map((n) => {
                 const on = n.match(pathname);
                 return (
-                  <Link key={n.href} href={n.href} className={cn('relative rounded-lg px-3 py-2 text-label-sm transition-colors', on ? 'text-primary-base' : 'text-text-sub-600 hover:bg-bg-weak-50 hover:text-text-strong-950')}>
+                  <Link key={n.href} href={n.href} className={cn('relative rounded-lg px-3 py-2 text-label-sm transition active:scale-[0.97]', on ? 'text-primary-base' : 'text-text-sub-600 hover:bg-bg-weak-50 hover:text-text-strong-950')}>
                     {n.label}
                   </Link>
                 );
@@ -57,7 +57,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               const on = n.match(pathname);
               const Icon = on ? n.active : n.icon;
               return (
-                <Link key={n.href} href={n.href} className={cn('relative flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium', on ? 'text-primary-base' : 'text-text-strong-950')}>
+                <Link key={n.href} href={n.href} className={cn('relative flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-transform duration-150 ease-out active:scale-95', on ? 'text-primary-base' : 'text-text-strong-950')}>
                   <Icon className="size-6" />
                   {n.label}
                 </Link>
@@ -73,7 +73,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 function InboxBell({ on, unread }: { on: boolean; unread: number }) {
   const Icon = on ? RiNotification3Fill : RiNotification3Line;
   return (
-    <Link href="/inbox" title="Inbox" aria-label={unread ? `Inbox, ${unread} unread` : 'Inbox'} className={cn('relative grid size-9 place-items-center rounded-full transition-colors hover:bg-bg-weak-50', on ? 'text-primary-base' : 'text-text-sub-600')}>
+    <Link href="/inbox" title="Inbox" aria-label={unread ? `Inbox, ${unread} unread` : 'Inbox'} className={cn('relative grid size-9 place-items-center rounded-full transition hover:bg-bg-weak-50 active:scale-95', on ? 'text-primary-base' : 'text-text-sub-600')}>
       <Icon className="size-5" />
       {unread > 0 && <span className="absolute right-0.5 top-0.5 inline-grid h-4 min-w-4 place-items-center rounded-full bg-primary-base px-1 text-[10px] font-medium text-static-white ring-2 ring-bg-white-0">{unread}</span>}
     </Link>

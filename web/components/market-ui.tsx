@@ -60,7 +60,7 @@ export function InstrumentRow({ i, s, spark = true, compact }: { i: Instrument; 
   const pct = price / prevClose(i) - 1;
   if (compact) {
     return (
-      <Link href={`/trade/${i.symbol}`} className="-mx-2 flex items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-bg-weak-50">
+      <Link href={`/trade/${i.symbol}`} className="-mx-2 flex items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-bg-weak-50 active:bg-bg-weak-50">
         <InstrumentLogo i={i} className="size-8 text-label-xs" />
         <div className="min-w-0 flex-1">
           <div className="text-label-sm text-text-strong-950">{i.symbol}</div>
@@ -74,7 +74,7 @@ export function InstrumentRow({ i, s, spark = true, compact }: { i: Instrument; 
     );
   }
   return (
-    <Link href={`/trade/${i.symbol}`} className="-mx-2 flex items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-bg-weak-50">
+    <Link href={`/trade/${i.symbol}`} className="-mx-2 flex items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-bg-weak-50 active:bg-bg-weak-50">
       <InstrumentLogo i={i} />
       <div className="min-w-0 flex-1">
         <div className="text-label-md text-text-strong-950">{i.symbol}</div>

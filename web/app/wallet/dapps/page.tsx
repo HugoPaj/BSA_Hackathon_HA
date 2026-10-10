@@ -87,7 +87,7 @@ function DappsInner({ data, treasury, refresh }: { data: Required<NonNullable<Re
             <div className="mt-4 space-y-2">
               {d.actions.map((a) => (
                 <button key={a.id} onClick={() => { setCurrent({ ...a, site: d.site }); setOpen(true); flow.prepare(a.txs, { type: 'approve', ...a.meta, fee: SERVICE_FEE }); }}
-                  className="flex w-full items-center justify-between gap-3 rounded-xl bg-bg-weak-50 px-4 py-3 text-left transition hover:bg-bg-soft-200">
+                  className="flex w-full items-center justify-between gap-3 rounded-xl bg-bg-weak-50 px-4 py-3 text-left transition hover:bg-bg-soft-200 active:scale-[0.99]">
                   <span><span className="block text-label-sm text-text-strong-950">{a.title}</span><span className="block text-paragraph-xs text-text-sub-600">{a.description}</span></span>
                   <RiArrowRightLine className="size-5 shrink-0 text-text-soft-400" />
                 </button>

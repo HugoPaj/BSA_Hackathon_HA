@@ -14,7 +14,9 @@ export const compactButtonVariants = tv({
     root: [
       // base
       'relative flex shrink-0 items-center justify-center outline-none',
-      'transition duration-200 ease-out',
+      'transition duration-150 ease-out',
+      // press feedback
+      'active:scale-[0.97]',
       // disabled
       'disabled:pointer-events-none disabled:border-transparent disabled:bg-transparent disabled:text-text-disabled-300 disabled:shadow-none',
       // focus

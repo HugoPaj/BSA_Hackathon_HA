@@ -592,7 +592,13 @@
   --animate-accordion-down: accordion-down 0.2s ease-out;
   
   --animate-accordion-up: accordion-up 0.2s ease-out;
-  
+
+  /* Motion: stronger curves than the CSS defaults. `ease-out` / `ease-in-out` classes pick these up. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  /* A faster spinner makes the same wait feel shorter. */
+  --animate-spin: spin 0.7s linear infinite;
 }
 
 /* Class-based Dark Mode Support */
@@ -867,6 +873,12 @@ body {
 /* Swissquote display headline: bold, uppercase, tight. Landing and onboarding only. */
 .sq-display { font-weight: 700; text-transform: uppercase; line-height: 1; letter-spacing: 0; }
 
-@keyframes fade-in-up { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
-.animate-fade-in-up { animation: fade-in-up 0.35s ease-out both; }
-@media (prefers-reduced-motion: reduce) { .animate-fade-in-up { animation: none; } }
+@keyframes fade-in-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes fade-in { from { opacity: 0; } }
+.animate-fade-in-up { animation: fade-in-up 250ms cubic-bezier(0.23, 1, 0.32, 1) both; }
+/* Children that enter together cascade instead of appearing at once. */
+.stagger > :nth-child(2) { animation-delay: 50ms; }
+.stagger > :nth-child(3) { animation-delay: 100ms; }
+.stagger > :nth-child(n + 4) { animation-delay: 150ms; }
+/* Reduced motion keeps the fade, drops the movement. */
+@media (prefers-reduced-motion: reduce) { .animate-fade-in-up { animation-name: fade-in; animation-duration: 200ms; } }

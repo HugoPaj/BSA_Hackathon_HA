@@ -10,7 +10,13 @@ export function Sheet({ open, onOpenChange, title, children, className, dismissa
     <Modal.Root open={open} onOpenChange={(o) => (dismissable || o ? onOpenChange(o) : undefined)}>
       <Modal.Content
         overlayClassName="justify-end p-0 sm:justify-center sm:p-4"
-        className={cn('max-h-[92dvh] max-w-full overflow-y-auto rounded-b-none sm:max-w-[460px] sm:rounded-20', className)}
+        className={cn(
+          'max-h-[92dvh] max-w-full overflow-y-auto rounded-b-none sm:max-w-[460px] sm:rounded-20',
+          // Phones: a bottom sheet comes from the bottom edge, so slide it rather than zoom it.
+          'max-sm:data-[state=open]:zoom-in-100 max-sm:data-[state=closed]:zoom-out-100 max-sm:slide-in-from-bottom-full max-sm:slide-out-to-bottom-full',
+          'max-sm:ease-drawer max-sm:data-[state=open]:duration-300 max-sm:data-[state=closed]:duration-200',
+          className,
+        )}
         showClose={dismissable}
         onInteractOutside={(e) => !dismissable && e.preventDefault()}
         onEscapeKeyDown={(e) => !dismissable && e.preventDefault()}

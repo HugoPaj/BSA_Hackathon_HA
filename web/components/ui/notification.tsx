@@ -88,11 +88,15 @@ const Notification = React.forwardRef<
         ref={forwardedRef}
         className={cn(
           // open
+          'ease-out data-[state=open]:duration-300',
           'data-[state=open]:animate-in data-[state=open]:max-[639px]:slide-in-from-top-full data-[state=open]:sm:slide-in-from-right-full',
-          // close
-          'data-[state=closed]:animate-out data-[state=closed]:fade-out-80 data-[state=open]:max-[639px]:slide-out-to-top-full data-[state=closed]:sm:slide-out-to-right-full',
-          // swipe
-          'data-[swipe=cancel]:translate-x-0 data-[swipe=end]:translate-x-[var(--radix-toast-swipe-end-x)] data-[swipe=move]:translate-x-[var(--radix-toast-swipe-move-x)] data-[swipe=move]:transition-none data-[swipe=end]:animate-out',
+          // close: leaves the way it came in, a little faster than it entered
+          'data-[state=closed]:duration-200',
+          'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:max-[639px]:slide-out-to-top-full data-[state=closed]:sm:slide-out-to-right-full',
+          // swipe (up on phones, right on larger screens; see the provider's swipeDirection)
+          'data-[swipe=cancel]:translate-x-0 data-[swipe=end]:translate-x-[var(--radix-toast-swipe-end-x)] data-[swipe=move]:translate-x-[var(--radix-toast-swipe-move-x)]',
+          'data-[swipe=cancel]:translate-y-0 data-[swipe=end]:translate-y-[var(--radix-toast-swipe-end-y)] data-[swipe=move]:translate-y-[var(--radix-toast-swipe-move-y)]',
+          'data-[swipe=cancel]:transition-[translate] data-[swipe=move]:transition-none data-[swipe=end]:animate-out',
           className,
         )}
         asChild

@@ -55,7 +55,7 @@ function Landing() {
       </section>
       <div className="space-y-3">
         <LoginCard subtitle="Use your Swissquote client login to open or manage your wallet." />
-        <Link href="/recover" className="flex items-center justify-between rounded-2xl bg-bg-white-0 px-5 py-4 ring-1 ring-inset ring-stroke-soft-200 hover:bg-bg-weak-50">
+        <Link href="/recover" className="flex items-center justify-between rounded-2xl bg-bg-white-0 px-5 py-4 ring-1 ring-inset ring-stroke-soft-200 transition hover:bg-bg-weak-50 active:scale-[0.99]">
           <span>
             <span className="block text-label-sm text-text-strong-950">Lost your device?</span>
             <span className="block text-paragraph-xs text-text-sub-600">Recover your wallet with a new passkey</span>
@@ -93,7 +93,7 @@ function Dashboard() {
             <div className="text-subheading-xs uppercase tracking-wider text-static-white/80">New</div>
             <h2 className="sq-display mt-3 text-[34px] md:text-[52px]">Open your self-custody wallet</h2>
             <p className="mt-4 text-[17px] font-medium leading-snug text-static-white/90">Hold USDC in a wallet only you control. Set up in under a minute with a passkey. Recovery included, gas on us.</p>
-            <Link href="/wallet/new" className="mt-6 inline-flex h-12 items-center gap-2 rounded-xl bg-static-white px-5 text-label-md text-primary-base shadow-regular-md transition hover:bg-[#fff6f3]">
+            <Link href="/wallet/new" className="mt-6 inline-flex h-12 items-center gap-2 rounded-xl bg-static-white px-5 text-label-md text-primary-base shadow-regular-md transition hover:bg-[#fff6f3] active:scale-[0.97]">
               {wallet ? 'Finish setting up' : 'Open self-custody wallet'} <RiArrowRightSLine className="size-5" />
             </Link>
           </div>
@@ -106,7 +106,7 @@ function Dashboard() {
         <aside className="flex flex-col gap-6">
           {unknown && <div className="min-h-[220px] flex-1 animate-pulse rounded-3xl bg-bg-weak-50 ring-1 ring-inset ring-stroke-soft-200" />}
           {deployed && wallet && (
-            <Link href="/wallet" className="flex flex-1 flex-col rounded-3xl bg-bg-white-0 p-5 shadow-regular-xs ring-1 ring-inset ring-stroke-soft-200 transition hover:shadow-regular-md">
+            <Link href="/wallet" className="flex flex-1 flex-col rounded-3xl bg-bg-white-0 p-5 shadow-regular-xs ring-1 ring-inset ring-stroke-soft-200 transition hover:shadow-regular-md active:scale-[0.99]">
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-2 text-label-sm text-text-sub-600"><RiWallet3Line className="size-[18px] text-primary-base" />Self-custody wallet</span>
                 <RiArrowRightSLine className="size-5 text-text-soft-400" />
@@ -194,7 +194,7 @@ function TradingCard({ s }: { s: MarketState }) {
 
       <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
         {tiles.map((c) => (
-          <Link key={c.label} href={c.href} className="rounded-2xl p-3.5 ring-1 ring-inset ring-stroke-soft-200 transition-colors hover:bg-bg-weak-50">
+          <Link key={c.label} href={c.href} className="rounded-2xl p-3.5 ring-1 ring-inset ring-stroke-soft-200 transition hover:bg-bg-weak-50 active:scale-[0.97]">
             <div className="flex items-center justify-between text-paragraph-sm text-text-strong-950">
               <span className="flex items-center gap-1.5"><c.icon className="size-4 text-primary-base" />{c.label}</span>
               <RiArrowRightSLine className="size-4 text-text-soft-400" />

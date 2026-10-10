@@ -14,7 +14,9 @@ export const buttonVariants = tv({
     root: [
       // base
       'group relative inline-flex items-center justify-center whitespace-nowrap outline-none',
-      'transition duration-200 ease-out',
+      'transition duration-150 ease-out',
+      // press feedback
+      'active:scale-[0.97]',
       // focus
       'focus:outline-none',
       // disabled

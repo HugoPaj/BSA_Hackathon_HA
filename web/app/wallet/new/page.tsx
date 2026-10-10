@@ -145,7 +145,7 @@ function FactorStep({ factor, setFactor, onNext }: { factor: Factor; setFactor: 
             { id: 'passkey', icon: RiMacbookLine, t: 'Passkey on another device', d: 'Your laptop, a second phone or a security key', tag: 'Recommended' },
             { id: 'card', icon: RiIdCardLine, t: 'Recovery card', d: 'A printable code locked with a 6-digit PIN', tag: 'Offline' },
           ] as const).map((o) => (
-            <button key={o.id} onClick={() => setChoice(o.id)} className={cn('rounded-2xl p-4 text-left ring-1 ring-inset transition', choice === o.id ? 'bg-primary-alpha-10 ring-primary-base' : 'bg-bg-white-0 ring-stroke-soft-200 hover:bg-bg-weak-50')}>
+            <button key={o.id} onClick={() => setChoice(o.id)} className={cn('rounded-2xl p-4 text-left ring-1 ring-inset transition active:scale-[0.98]', choice === o.id ? 'bg-primary-alpha-10 ring-primary-base' : 'bg-bg-white-0 ring-stroke-soft-200 hover:bg-bg-weak-50')}>
               <div className="flex items-center justify-between"><o.icon className={cn('size-6', choice === o.id ? 'text-primary-base' : 'text-text-sub-600')} /><span className="text-label-xs text-text-soft-400">{o.tag}</span></div>
               <div className="mt-3 text-label-sm text-text-strong-950">{o.t}</div>
               <div className="text-paragraph-xs text-text-sub-600">{o.d}</div>

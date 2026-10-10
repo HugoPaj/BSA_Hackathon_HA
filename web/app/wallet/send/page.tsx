@@ -55,7 +55,7 @@ function SendForm({ data, cfg, to, setTo, amountText, setAmountText, open, setOp
           <Label.Root>Recipient</Label.Root>
           <div className="flex flex-wrap gap-2">
             {CONTACTS.map((c) => (
-              <button key={c.address} onClick={() => setTo(c.address)} className={cn('flex items-center gap-2 rounded-full py-1.5 pl-1.5 pr-3 text-label-sm ring-1 ring-inset transition', to === c.address ? 'bg-primary-alpha-10 text-primary-dark ring-primary-base' : 'bg-bg-white-0 text-text-strong-950 ring-stroke-soft-200 hover:bg-bg-weak-50')}>
+              <button key={c.address} onClick={() => setTo(c.address)} className={cn('flex items-center gap-2 rounded-full py-1.5 pl-1.5 pr-3 text-label-sm ring-1 ring-inset transition active:scale-[0.97]', to === c.address ? 'bg-primary-alpha-10 text-primary-dark ring-primary-base' : 'bg-bg-white-0 text-text-strong-950 ring-stroke-soft-200 hover:bg-bg-weak-50')}>
                 <span className={cn('grid size-6 place-items-center rounded-full text-[11px]', c.note.startsWith('Demo') ? 'bg-error-lighter text-error-base' : 'bg-bg-weak-50 text-text-sub-600')}>{c.note.startsWith('Demo') ? <RiErrorWarningLine className="size-3.5" /> : c.name.split(' ').map((p) => p[0]).join('')}</span>
                 {c.name}
               </button>

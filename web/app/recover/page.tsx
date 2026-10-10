@@ -69,7 +69,7 @@ function Recover() {
     <div className="mx-auto max-w-[620px]">
       <PageTitle title="Recover your wallet" subtitle={<>Replace a lost passkey for wallet <span className="font-mono text-paragraph-xs">{shortAddress(info.wallet.address)}</span>. Same address, same funds.</>} back="/" />
       <Steps info={info} hasKey={!!newKey || !!s} />
-      <div className="mt-5 space-y-5">
+      <div className="stagger mt-5 space-y-5">
         {stage === 'passkey' && <NewPasskey info={info} onCreated={setNewKey} />}
         {stage === 'start' && newKey && <StartRecovery info={info} newKey={newKey} onStarted={(id) => { setSessionId(id); localStorage.setItem(LS, JSON.stringify({ id })); load(id); }} />}
         {stage === 'collect' && s && <Collect info={info} session={s} onChange={() => load()} />}

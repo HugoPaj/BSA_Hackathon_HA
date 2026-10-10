@@ -23,6 +23,7 @@ const ModalOverlay = React.forwardRef<
         'fixed inset-0 z-50 flex flex-col items-center justify-center overflow-y-auto bg-overlay p-4 backdrop-blur-[10px]',
         // animation
         'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
+        'ease-out data-[state=open]:duration-200 data-[state=closed]:duration-150',
         className,
       )}
       {...rest}
@@ -57,6 +58,7 @@ const ModalContent = React.forwardRef<
               'data-[state=open]:animate-in data-[state=closed]:animate-out',
               'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
               'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
+              'ease-out data-[state=open]:duration-200 data-[state=closed]:duration-150',
               className,
             )}
             {...rest}

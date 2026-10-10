@@ -29,9 +29,10 @@ const DropdownMenuContent = React.forwardRef<
       className={cn(
         'z-50 w-[300px] overflow-hidden rounded-2xl bg-bg-white-0 p-2 shadow-regular-md ring-1 ring-inset ring-stroke-soft-200',
         'flex flex-col gap-1',
-        // origin
-        'data-[side=bottom]:origin-top data-[side=left]:origin-right data-[side=right]:origin-left data-[side=top]:origin-bottom',
+        // origin: scale out of the trigger
+        'origin-(--radix-dropdown-menu-content-transform-origin)',
         // animation
+        'ease-out data-[state=open]:duration-200 data-[state=closed]:duration-150',
         'data-[state=open]:animate-in data-[state=open]:fade-in-0',
         'data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
         'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
@@ -158,7 +159,9 @@ const DropdownMenuSubContent = React.forwardRef<
     className={cn(
       'z-50 w-max overflow-hidden rounded-2xl bg-bg-white-0 p-2 shadow-regular-md ring-1 ring-inset ring-stroke-soft-200',
       'flex flex-col gap-1',
+      'origin-(--radix-dropdown-menu-content-transform-origin)',
       // animation
+      'ease-out data-[state=open]:duration-200 data-[state=closed]:duration-150',
       'data-[state=open]:animate-in data-[state=open]:fade-in-0',
       'data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
       'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',

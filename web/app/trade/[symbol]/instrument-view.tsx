@@ -54,14 +54,14 @@ function Detail({ i }: { i: Instrument }) {
     <div className="mx-auto grid max-w-[1080px] gap-6 lg:grid-cols-[1fr_320px]">
       <div className="min-w-0 space-y-6">
         <div className="flex items-center gap-3">
-          <Link href="/trade" className="grid size-9 shrink-0 place-items-center rounded-full bg-bg-white-0 text-text-sub-600 ring-1 ring-inset ring-stroke-soft-200 hover:bg-bg-weak-50" aria-label="Back"><RiArrowLeftLine className="size-5" /></Link>
+          <Link href="/trade" className="grid size-9 shrink-0 place-items-center rounded-full bg-bg-white-0 text-text-sub-600 ring-1 ring-inset ring-stroke-soft-200 transition hover:bg-bg-weak-50 active:scale-95" aria-label="Back"><RiArrowLeftLine className="size-5" /></Link>
           <InstrumentLogo i={i} className="size-10" />
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-title-h6 text-text-strong-950">{i.name}</h1>
             <div className="text-paragraph-xs uppercase text-text-soft-400">{i.symbol} · {i.detail}</div>
           </div>
           <button onClick={() => toggleWatch(i.symbol)} aria-pressed={watched} title={watched ? 'Remove from watchlist' : 'Add to watchlist'}
-            className={cn('grid size-10 place-items-center rounded-full ring-1 ring-inset ring-stroke-soft-200 transition hover:bg-bg-weak-50', watched ? 'text-primary-base' : 'text-text-soft-400')}>
+            className={cn('grid size-10 place-items-center rounded-full ring-1 ring-inset ring-stroke-soft-200 transition hover:bg-bg-weak-50 active:scale-95', watched ? 'text-primary-base' : 'text-text-soft-400')}>
             {watched ? <RiStarFill className="size-5" /> : <RiStarLine className="size-5" />}
           </button>
         </div>

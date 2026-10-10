@@ -13,7 +13,7 @@ export function QuickActions({ actions, className }: { actions: QuickAction[]; c
       {actions.map((a) => {
         const inner = (
           <>
-            <span className={cn('relative grid size-[52px] place-items-center rounded-full text-static-white shadow-regular-xs transition', a.primary ? 'bg-primary-base group-hover:bg-primary-darker' : 'bg-bg-strong-950 group-hover:bg-primary-base')}>
+            <span className={cn('relative grid size-[52px] place-items-center rounded-full text-static-white shadow-regular-xs transition duration-150 ease-out group-active:scale-95', a.primary ? 'bg-primary-base group-hover:bg-primary-darker' : 'bg-bg-strong-950 group-hover:bg-primary-base')}>
               <a.icon className="size-6" />
               {!!a.badge && <span className="absolute -right-0.5 -top-0.5 grid size-5 place-items-center rounded-full bg-primary-base text-[10px] font-medium ring-2 ring-bg-white-0">{a.badge}</span>}
             </span>

@@ -30,7 +30,7 @@ export function FundSheet({ open, onOpenChange, verified, onDone }: { open: bool
           <div className="rounded-xl bg-bg-weak-50 p-3 text-paragraph-sm text-text-sub-600">From <b className="text-text-strong-950">Trading 2162953</b> to your self-custody wallet. Testnet USDC from the demo treasury stands in for the bank&apos;s crypto desk.</div>
           <div className="grid grid-cols-3 gap-2">
             {[1_000_000n, 5_000_000n, 10_000_000n].map((a) => (
-              <button key={a.toString()} onClick={() => setAmount(a)} className={cn('h-14 rounded-xl text-label-md ring-1 ring-inset transition', amount === a ? 'bg-primary-alpha-10 text-primary-dark ring-primary-base' : 'bg-bg-white-0 text-text-strong-950 ring-stroke-soft-200 hover:bg-bg-weak-50')}>{formatUsdc(a)}</button>
+              <button key={a.toString()} onClick={() => setAmount(a)} className={cn('h-14 rounded-xl text-label-md ring-1 ring-inset transition active:scale-[0.97]', amount === a ? 'bg-primary-alpha-10 text-primary-dark ring-primary-base' : 'bg-bg-white-0 text-text-strong-950 ring-stroke-soft-200 hover:bg-bg-weak-50')}>{formatUsdc(a)}</button>
             ))}
           </div>
           {verified

@@ -19,7 +19,7 @@ export function AccountMenu() {
 
   return (
     <Dropdown.Root>
-      <Dropdown.Trigger className="group flex items-center gap-2 rounded-full p-0.5 outline-none transition-colors hover:bg-bg-weak-50 focus-visible:ring-2 focus-visible:ring-primary-alpha-16 data-[state=open]:bg-bg-weak-50 lg:pr-2">
+      <Dropdown.Trigger className="group flex items-center gap-2 rounded-full p-0.5 outline-none transition hover:bg-bg-weak-50 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-primary-alpha-16 data-[state=open]:bg-bg-weak-50 lg:pr-2">
         {avatar('32')}
         <span className="hidden text-label-sm text-text-strong-950 lg:block">{client.name}</span>
         <RiArrowDownSLine className="hidden size-5 text-text-soft-400 transition-transform group-data-[state=open]:rotate-180 lg:block" />
