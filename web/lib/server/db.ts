@@ -1,13 +1,13 @@
 import 'server-only';
-// Tiny JSON-file store for the mocked Swissquote backend. Single process, synchronous writes.
+// Tiny JSON document store for the mocked Swissquote backend.
 import fs from 'node:fs';
 import path from 'node:path';
+import { Client, neon } from '@neondatabase/serverless';
 import { parse, stringify } from '../json';
 import type { DnieCard, GuardianB } from '../chain';
 import type { LivenessAttestation } from '../liveness';
 
-// Vercel's disk is read-only except /tmp, which is per instance and wiped on cold starts.
-export const DATA_DIR = process.env.DATA_DIR ?? (process.env.VERCEL ? '/tmp/sq-data' : path.join(process.cwd(), '.data'));
+export const DATA_DIR = process.env.DATA_DIR ?? path.join(process.cwd(), '.data');
 const FILE = path.join(DATA_DIR, 'db.json');
 
 export type Owner = { x: bigint; y: bigint; credentialId: string; signer: string };
@@ -96,26 +96,61 @@ type DB = {
 
 const empty = (): DB => ({ sessions: {}, wallets: {}, recoveries: {}, alerts: [], activity: [], audit: [], stepUps: {}, dnieRequests: {} });
 
-function load(): DB {
-  try {
-    return { ...empty(), ...parse<DB>(fs.readFileSync(FILE, 'utf8')) };
-  } catch {
-    return empty();
+// Two backends: Postgres (Neon) when DATABASE_URL is set, which every Vercel instance shares, and a local JSON
+// file otherwise. Either way the whole store is one document, and a write locks it for its read-modify-write.
+const DATABASE_URL = process.env.DATABASE_URL;
+const fromText = (text: string | null | undefined): DB => (text ? { ...empty(), ...parse<DB>(text) } : empty());
+
+let table: Promise<unknown> | undefined;
+const ensureTable = () => (table ??= neon(DATABASE_URL!).query('create table if not exists sq_store (key text primary key, doc text not null)').catch((e) => { table = undefined; throw e; }));
+
+function fileStore() {
+  if (process.env.VERCEL && !DATABASE_URL) throw new Error('DATABASE_URL is not set: Vercel has no writable disk for the file store');
+  return !DATABASE_URL;
+}
+
+async function load(): Promise<DB> {
+  if (fileStore()) {
+    try { return fromText(fs.readFileSync(FILE, 'utf8')); } catch { return empty(); }
   }
+  await ensureTable();
+  const rows = await neon(DATABASE_URL!).query('select doc from sq_store where key = $1', ['db']);
+  return fromText(rows[0]?.doc);
 }
 
-export function read<T>(fn: (db: DB) => T): T {
-  return fn(load());
+export async function read<T>(fn: (db: DB) => T): Promise<T> {
+  return fn(await load());
 }
 
-export function write<T>(fn: (db: DB) => T): T {
-  const db = load();
-  const out = fn(db);
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  const tmp = FILE + '.tmp';
-  fs.writeFileSync(tmp, stringify(db));
-  fs.renameSync(tmp, FILE);
-  return out;
+export async function write<T>(fn: (db: DB) => T): Promise<T> {
+  if (fileStore()) {
+    const db = await load();
+    const out = fn(db);
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    const tmp = FILE + '.tmp';
+    fs.writeFileSync(tmp, stringify(db));
+    fs.renameSync(tmp, FILE);
+    return out;
+  }
+  await ensureTable();
+  // A websocket client per write, closed before returning: serverless instances can't keep one between requests.
+  const client = new Client(DATABASE_URL!);
+  await client.connect();
+  try {
+    await client.query('begin');
+    await client.query("insert into sq_store (key, doc) values ('db', '{}') on conflict do nothing");
+    const { rows } = await client.query('select doc from sq_store where key = $1 for update', ['db']);
+    const db = fromText(rows[0]?.doc);
+    const out = fn(db);
+    await client.query('update sq_store set doc = $2 where key = $1', ['db', stringify(db)]);
+    await client.query('commit');
+    return out;
+  } catch (e) {
+    await client.query('rollback').catch(() => {});
+    throw e;
+  } finally {
+    await client.end();
+  }
 }
 
 export const id = () => crypto.randomUUID();
@@ -125,14 +160,14 @@ export function walletByAddress(db: DB, address: string) {
 }
 
 export function audit(entry: Omit<AuditEntry, 'id' | 'ts'>) {
-  write((db) => {
+  return write((db) => {
     db.audit.unshift({ id: id(), ts: Date.now(), ...entry });
     db.audit = db.audit.slice(0, 500);
   });
 }
 
 export function alert(wallet: string, a: Omit<Alert, 'id' | 'ts' | 'wallet' | 'channels'> & { channels?: string[] }) {
-  write((db) => {
+  return write((db) => {
     db.alerts.unshift({ id: id(), ts: Date.now(), wallet, channels: a.channels ?? ['Push', 'E-mail', 'E-banking inbox'], ...a });
   });
 }
@@ -146,7 +181,7 @@ export function addActivity(a: Omit<Activity, 'id' | 'ts'>) {
 }
 
 export function updateActivity(match: (a: Activity) => boolean, patch: Partial<Activity>) {
-  write((db) => {
+  return write((db) => {
     for (const a of db.activity) if (match(a)) Object.assign(a, patch);
   });
 }

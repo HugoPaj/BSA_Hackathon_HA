@@ -20,12 +20,12 @@ export async function GET(req: Request) {
   const client = await recoveryClient();
   if (!client) return fail('Identify yourself first', 401);
   const who = { clientId: client.clientId, name: client.name };
-  const wallet = read((db) => db.wallets[client.clientId]);
+  const wallet = await read((db) => db.wallets[client.clientId]);
   if (!wallet) return json({ client: who, wallet: null });
   const rid = new URL(req.url).searchParams.get('id');
   const state = await readWalletState(NODE_RPC, wallet.address);
   await syncRecoveries(wallet, state);
-  const session = rid ? publicSession(read((db) => db.recoveries[rid])) : null;
+  const session = rid ? publicSession(await read((db) => db.recoveries[rid])) : null;
   return json({
     client: who,
     wallet: { address: wallet.address, guardianA: wallet.guardianA, guardianB: wallet.guardianB, bankAssisted: wallet.bankAssisted, deployed: state.deployed },
@@ -41,26 +41,26 @@ export async function POST(req: Request) {
     const c = checkCredentials(b.clientId ?? '', b.password ?? '');
     if (!c) return fail('Client number or password is wrong', 401);
     await createRecoverySession(c.clientId);
-    audit({ actor: 'E-banking', action: 'Recovery identification', detail: `Client ${c.clientId} identified to recover their wallet (recovery access only)`, outcome: 'info' });
+    await audit({ actor: 'E-banking', action: 'Recovery identification', detail: `Client ${c.clientId} identified to recover their wallet (recovery access only)`, outcome: 'info' });
     return json({ client: { clientId: c.clientId, name: c.name } });
   }
   const client = await recoveryClient();
   if (!client) return fail('Identify yourself first', 401);
-  const wallet = read((db) => db.wallets[client.clientId]);
+  const wallet = await read((db) => db.wallets[client.clientId]);
   if (!wallet) return fail('No wallet found for this client');
   try {
     if (b.action === 'start') {
       const started = await startRecovery(wallet, b.newOwner);
-      if (client.sid) bindRecovery(client.sid, started.id);
+      if (client.sid) await bindRecovery(client.sid, started.id);
       return json({ session: publicSession(started) });
     }
-    const session = read((db) => db.recoveries[b.id]);
+    const session = await read((db) => db.recoveries[b.id]);
     if (!session || session.clientId !== client.clientId) return fail('Unknown recovery request', 404);
     if (b.action === 'guardian') return json({ session: publicSession(await approveGuardianB(session, wallet, b.signature)) });
     if (b.action === 'dnie') {
       // The DNI approves on a phone, which has no recovery cookie: hand it a single-use request instead.
       if (wallet.guardianB.type !== 'dnie') return fail('This wallet does not use a DNI as recovery factor');
-      const r = createDnieRequest({
+      const r = await createDnieRequest({
         clientId: client.clientId, purpose: 'recovery', ref: session.id, hash: session.hash, title: 'Approve wallet recovery',
         lines: [`Replace the owner of wallet ${shortAddress(session.wallet)}`, `with the new passkey ${shortAddress(session.newOwner.signer)}.`, 'Swissquote must also approve, then a safety delay runs that the current owner can cancel.'],
       });

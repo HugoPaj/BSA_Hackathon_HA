@@ -107,7 +107,7 @@ export async function evaluate(op: UserOperationV7, wallet: WalletRecord, stepUp
 
   // 5. High-value step-up: the client's recovery factor confirms large transfers and large approvals.
   if (outgoing >= STEP_UP_THRESHOLD || largeApproval) {
-    const verified = stepUpId && read((db) => {
+    const verified = stepUpId && await read((db) => {
       const s = db.stepUps[stepUpId];
       return s && s.verified && s.wallet.toLowerCase() === wallet.address.toLowerCase() && s.callDataHash === keccak256(op.callData as Hex) && s.expires > Date.now();
     });

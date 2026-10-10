@@ -5,12 +5,12 @@ import { currentClient, fail, json } from '@/lib/server/session';
 export async function POST() {
   const client = await currentClient();
   if (!client) return fail('Not logged in', 401);
-  write((db) => {
+  await write((db) => {
     const w = db.wallets[client.clientId];
     if (!w) return;
     delete db.wallets[client.clientId];
     for (const [k, r] of Object.entries(db.recoveries)) if (r.wallet === w.address) delete db.recoveries[k];
   });
-  audit({ actor: 'Demo', action: 'Demo reset', detail: `Client ${client.clientId} wallet record cleared`, outcome: 'info' });
+  await audit({ actor: 'Demo', action: 'Demo reset', detail: `Client ${client.clientId} wallet record cleared`, outcome: 'info' });
   return json({ ok: true });
 }

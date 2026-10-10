@@ -13,22 +13,22 @@ export async function POST(req: Request) {
   if (!client) return fail('Not logged in', 401);
   const b = await body<{ action: 'create'; wallet: string; callData: Hex } | { action: 'verify'; id: string; signature: Hex } | { action: 'dnie'; id: string }>(req);
   if (b.action === 'create') {
-    const wallet = read((db) => walletByAddress(db, b.wallet));
+    const wallet = await read((db) => walletByAddress(db, b.wallet));
     if (!wallet || wallet.clientId !== client.clientId) return fail('Unknown wallet', 404);
     const sid = id();
     const callDataHash = keccak256(b.callData);
     const challenge = keccak256(toBytes(`Swissquote high-value confirmation|${wallet.address}|${callDataHash}|${sid}`));
-    write((db) => { db.stepUps[sid] = { id: sid, wallet: wallet.address, challenge, callDataHash, expires: Date.now() + 10 * 60_000 }; });
+    await write((db) => { db.stepUps[sid] = { id: sid, wallet: wallet.address, challenge, callDataHash, expires: Date.now() + 10 * 60_000 }; });
     return json({ id: sid, challenge, guardianB: wallet.guardianB });
   }
-  const s = read((db) => db.stepUps[b.id]);
+  const s = await read((db) => db.stepUps[b.id]);
   if (!s || s.expires < Date.now()) return fail('Confirmation expired');
-  const wallet = read((db) => walletByAddress(db, s.wallet));
+  const wallet = await read((db) => walletByAddress(db, s.wallet));
   if (!wallet || wallet.clientId !== client.clientId) return fail('Unknown wallet', 404);
   if (b.action === 'dnie') {
     // The DNI signs on the phone; /api/dnie verifies it against the wallet's RsaGuardian and marks this step-up verified.
     if (wallet.guardianB.type !== 'dnie') return fail('This wallet does not use a DNI as recovery factor');
-    const r = createDnieRequest({
+    const r = await createDnieRequest({
       clientId: client.clientId, purpose: 'stepup', ref: s.id, hash: s.challenge, title: 'Confirm a high-value transaction',
       lines: [`Wallet ${shortAddress(wallet.address)} is sending a high-value transaction.`, `Transaction fingerprint ${s.callDataHash.slice(0, 10)}…${s.callDataHash.slice(-6)}`, 'Your passkey signs it after your DNI confirms.'],
     });
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
     ? await isValid1271(NODE_RPC, gB.address, s.challenge as Hex, b.signature)
     : await recoverAddress({ hash: s.challenge as Hex, signature: b.signature }).then((a) => isAddressEqual(a, gB.address as Hex)).catch(() => false));
   if (!ok) return fail('That confirmation did not come from your recovery factor');
-  write((db) => { db.stepUps[b.id].verified = true; });
-  audit({ actor: 'Paymaster policy', action: 'High-value step-up confirmed', wallet: wallet.address, detail: `${gB.label} co-signed the transaction`, outcome: 'approved' });
+  await write((db) => { db.stepUps[b.id].verified = true; });
+  await audit({ actor: 'Paymaster policy', action: 'High-value step-up confirmed', wallet: wallet.address, detail: `${gB.label} co-signed the transaction`, outcome: 'approved' });
   return json({ ok: true });
 }

@@ -4,7 +4,7 @@ import { audit, read } from '@/lib/server/db';
 export async function GET() {
   const client = await currentClient();
   if (!client) return json({ client: null });
-  const wallet = read((db) => db.wallets[client.clientId]);
+  const wallet = await read((db) => db.wallets[client.clientId]);
   return json({ client, wallet: wallet ? { address: wallet.address, deployed: !!wallet.deployedAt } : null });
 }
 
@@ -13,7 +13,7 @@ export async function POST(req: Request) {
   const client = checkCredentials(clientId ?? '', password ?? '');
   if (!client) return fail('Client number or password is wrong', 401);
   await createSession(client.clientId);
-  audit({ actor: 'E-banking', action: 'Login', detail: `Client ${client.clientId} logged in`, outcome: 'info' });
+  await audit({ actor: 'E-banking', action: 'Login', detail: `Client ${client.clientId} logged in`, outcome: 'info' });
   return json({ client });
 }
 

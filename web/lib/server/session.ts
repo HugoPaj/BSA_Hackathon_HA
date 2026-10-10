@@ -23,28 +23,28 @@ export function checkCredentials(clientId: string, password: string) {
 
 export async function createSession(clientId: string) {
   const sid = id();
-  write((db) => { db.sessions[sid] = { clientId, createdAt: Date.now() }; });
+  await write((db) => { db.sessions[sid] = { clientId, createdAt: Date.now() }; });
   (await cookies()).set(COOKIE, sid, { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/', maxAge: 60 * 60 * 12 });
 }
 
 /** Identify the client for recovery only. An hour covers the demo's 3-minute delay; a resumed recovery just identifies again. */
 export async function createRecoverySession(clientId: string) {
   const sid = id();
-  write((db) => { db.sessions[sid] = { clientId, createdAt: Date.now(), scope: 'recovery' }; });
+  await write((db) => { db.sessions[sid] = { clientId, createdAt: Date.now(), scope: 'recovery' }; });
   (await cookies()).set(RECOVERY_COOKIE, sid, { httpOnly: true, sameSite: 'strict', secure: process.env.NODE_ENV === 'production', path: RECOVERY_PATH, maxAge: 60 * 60 });
 }
 
 export async function destroySession() {
   const jar = await cookies();
   const sid = jar.get(COOKIE)?.value;
-  if (sid) write((db) => { delete db.sessions[sid]; });
+  if (sid) await write((db) => { delete db.sessions[sid]; });
   jar.delete(COOKIE);
 }
 
 export async function destroyRecoverySession() {
   const jar = await cookies();
   const sid = jar.get(RECOVERY_COOKIE)?.value;
-  if (sid) write((db) => { if (db.sessions[sid]?.scope === 'recovery') delete db.sessions[sid]; });
+  if (sid) await write((db) => { if (db.sessions[sid]?.scope === 'recovery') delete db.sessions[sid]; });
   jar.set(RECOVERY_COOKIE, '', { path: RECOVERY_PATH, maxAge: 0 });
 }
 
@@ -56,7 +56,7 @@ export function toClient(clientId: string): Client | null {
 /** The client of a full e-banking session. Recovery sessions don't count. */
 export async function currentClient(): Promise<Client | null> {
   const sid = (await cookies()).get(COOKIE)?.value;
-  const s = sid ? read((db) => db.sessions[sid]) : undefined;
+  const s = sid ? await read((db) => db.sessions[sid]) : undefined;
   return s && s.scope !== 'recovery' ? toClient(s.clientId) : null;
 }
 
@@ -65,19 +65,19 @@ export async function recoveryClient(): Promise<(Client & { sid?: string }) | nu
   const full = await currentClient();
   if (full) return full;
   const sid = (await cookies()).get(RECOVERY_COOKIE)?.value;
-  const s = sid ? read((db) => db.sessions[sid]) : undefined;
+  const s = sid ? await read((db) => db.sessions[sid]) : undefined;
   const c = s?.scope === 'recovery' ? toClient(s.clientId) : null;
   return c && { ...c, sid };
 }
 
 /** Remember which recovery request a recovery session started: only that one can upgrade it. */
-export function bindRecovery(sid: string, recoveryId: string) {
-  write((db) => { if (db.sessions[sid]) db.sessions[sid].recoveryId = recoveryId; });
+export async function bindRecovery(sid: string, recoveryId: string) {
+  await write((db) => { if (db.sessions[sid]) db.sessions[sid].recoveryId = recoveryId; });
 }
 
 /** The recovery this session started is complete: swap the recovery session for a full one. */
 export async function upgradeRecoverySession(sid: string, recoveryId: string) {
-  const s = read((db) => db.sessions[sid]);
+  const s = await read((db) => db.sessions[sid]);
   if (s?.scope !== 'recovery' || s.recoveryId !== recoveryId) return false;
   await destroyRecoverySession();
   await createSession(s.clientId);

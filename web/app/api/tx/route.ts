@@ -18,11 +18,11 @@ export async function POST(req: Request) {
   const client = await currentClient();
   if (!client) return fail('Not logged in', 401);
   const { userOp, meta } = await body<{ userOp: UserOperationV7; meta: Meta }>(req);
-  const wallet = read((db) => walletByAddress(db, userOp.sender));
+  const wallet = await read((db) => walletByAddress(db, userOp.sender));
   if (!wallet || wallet.clientId !== client.clientId) return fail('Unknown wallet', 403);
   try {
     const userOpHash = await bundler.sendUserOperation(userOp, ENTRYPOINT_V7);
-    addActivity({ wallet: wallet.address, ...meta, sponsored: !!userOp.paymaster, userOpHash, status: 'pending' });
+    await addActivity({ wallet: wallet.address, ...meta, sponsored: !!userOp.paymaster, userOpHash, status: 'pending' });
     return json({ userOpHash });
   } catch (e) {
     const err = e as Error & { cause?: Error };
@@ -37,8 +37,8 @@ export async function GET(req: Request) {
   if (!receipt) return json({ status: 'pending' });
   const txHash = receipt.receipt.transactionHash;
   const status = receipt.success ? 'confirmed' : 'failed';
-  updateActivity((a) => a.userOpHash === hash, { status, txHash });
-  const act = read((db) => db.activity.find((a) => a.userOpHash === hash));
-  if (act?.type === 'deploy' && receipt.success) write((db) => { const w = walletByAddress(db, act.wallet); if (w && !w.deployedAt) w.deployedAt = Date.now(); });
+  await updateActivity((a) => a.userOpHash === hash, { status, txHash });
+  const act = await read((db) => db.activity.find((a) => a.userOpHash === hash));
+  if (act?.type === 'deploy' && receipt.success) await write((db) => { const w = walletByAddress(db, act.wallet); if (w && !w.deployedAt) w.deployedAt = Date.now(); });
   return json({ status, txHash });
 }

@@ -12,9 +12,9 @@ import { approveGuardianB, isOnChainGuardian } from './recovery';
 
 const TTL = 15 * 60_000;
 
-export function createDnieRequest(r: Pick<DnieRequest, 'clientId' | 'purpose' | 'ref' | 'hash' | 'title' | 'lines'>) {
+export async function createDnieRequest(r: Pick<DnieRequest, 'clientId' | 'purpose' | 'ref' | 'hash' | 'title' | 'lines'>) {
   const req: DnieRequest = { ...r, id: id(), token: crypto.randomBytes(16).toString('hex'), createdAt: Date.now(), expires: Date.now() + TTL, status: 'open' };
-  write((db) => {
+  await write((db) => {
     for (const [k, v] of Object.entries(db.dnieRequests)) if (v.expires < Date.now() - TTL) delete db.dnieRequests[k];
     db.dnieRequests[req.id] = req;
   });
@@ -26,8 +26,8 @@ export function publicDnieRequest(r: DnieRequest) {
   return { id: r.id, purpose: r.purpose, title: r.title, lines: r.lines, hash: r.hash, done: r.status === 'done', error: r.error ?? null, card: r.card ?? null, expires: r.expires };
 }
 
-export function dnieRequestByToken(rid: string, token: string) {
-  const r = read((db) => db.dnieRequests[rid]);
+export async function dnieRequestByToken(rid: string, token: string) {
+  const r = await read((db) => db.dnieRequests[rid]);
   const same = !!r && typeof token === 'string' && token.length === r.token.length && crypto.timingSafeEqual(Buffer.from(r.token), Buffer.from(token));
   if (!r || !same) throw new Error('Unknown or expired DNI request');
   if (r.expires < Date.now()) throw new Error('This DNI request expired. Start again from the wallet.');
@@ -76,8 +76,8 @@ function readCard(res: DnieResult, clientId: string, clientName: string): { key:
 /** Called by the phone app (or the simulator) with the card's signature. Verifies it, then acts on the purpose. */
 export async function submitDnieResult(r: DnieRequest, res: DnieResult, clientName: string) {
   if (r.status === 'done') return r;
-  const fail = (msg: string): never => {
-    write((db) => { if (db.dnieRequests[r.id]) db.dnieRequests[r.id].error = msg; });
+  const fail = async (msg: string): Promise<never> => {
+    await write((db) => { if (db.dnieRequests[r.id]) db.dnieRequests[r.id].error = msg; });
     throw new Error(msg);
   };
   let key: crypto.KeyObject, card: DnieCard;
@@ -88,40 +88,40 @@ export async function submitDnieResult(r: DnieRequest, res: DnieResult, clientNa
   }
   const sig = Buffer.from((res.signature ?? '').replace(/^0x/, ''), 'hex');
   const ok = crypto.verify('sha256', Buffer.from(r.hash.slice(2), 'hex'), { key, padding: crypto.constants.RSA_PKCS1_PADDING }, sig);
-  if (!ok) fail('The card signature does not match the request');
+  if (!ok) await fail('The card signature does not match the request');
 
-  const wallet = read((db) => db.wallets[r.clientId]);
+  const wallet = await read((db) => db.wallets[r.clientId]);
   const registered = wallet?.guardianB.type === 'dnie' ? wallet.guardianB : null;
   if (r.purpose !== 'enroll') {
-    if (!wallet || !registered) fail('This wallet does not use a DNI as recovery factor');
-    if (registered!.modulus.toLowerCase() !== card.modulus.toLowerCase()) fail('This is not the DNI registered on this wallet');
+    if (!wallet || !registered) await fail('This wallet does not use a DNI as recovery factor');
+    if (registered!.modulus.toLowerCase() !== card.modulus.toLowerCase()) await fail('This is not the DNI registered on this wallet');
   }
 
   if (r.purpose === 'recovery') {
-    const session = read((db) => db.recoveries[r.ref!]);
-    if (!session || session.clientId !== r.clientId) fail('Unknown recovery request');
+    const session = await read((db) => db.recoveries[r.ref!]);
+    if (!session || session.clientId !== r.clientId) await fail('Unknown recovery request');
     try {
       await approveGuardianB(session, wallet!, res.signature);
     } catch (e) {
-      fail((e as Error).message);
+      await fail((e as Error).message);
     }
   } else if (r.purpose === 'stepup') {
-    const s = read((db) => db.stepUps[r.ref!]);
-    if (!s || s.expires < Date.now() || s.wallet.toLowerCase() !== wallet!.address.toLowerCase()) fail('This confirmation expired');
+    const s = await read((db) => db.stepUps[r.ref!]);
+    if (!s || s.expires < Date.now() || s.wallet.toLowerCase() !== wallet!.address.toLowerCase()) await fail('This confirmation expired');
     const onChain = (await isOnChainGuardian(wallet!.address, registered!.address)) && (await isValid1271(NODE_RPC, registered!.address, s.challenge as Hex, res.signature));
-    if (!onChain) fail('The wallet\'s DNI guardian contract rejected this signature');
-    write((db) => { db.stepUps[s.id].verified = true; });
-    audit({ actor: 'Paymaster policy', action: 'High-value step-up confirmed', wallet: wallet!.address, detail: `${registered!.holder}'s DNI co-signed the transaction (verified by the RsaGuardian contract)`, outcome: 'approved' });
+    if (!onChain) await fail('The wallet\'s DNI guardian contract rejected this signature');
+    await write((db) => { db.stepUps[s.id].verified = true; });
+    await audit({ actor: 'Paymaster policy', action: 'High-value step-up confirmed', wallet: wallet!.address, detail: `${registered!.holder}'s DNI co-signed the transaction (verified by the RsaGuardian contract)`, outcome: 'approved' });
   } else {
-    audit({ actor: 'Wallet service', action: card.simulated ? 'Simulated DNI enrolled' : 'DNI enrolled', detail: `${card.holder}, ${card.documentId}, issued by ${card.issuer}. PIN signature verified.`, outcome: 'info' });
+    await audit({ actor: 'Wallet service', action: card.simulated ? 'Simulated DNI enrolled' : 'DNI enrolled', detail: `${card.holder}, ${card.documentId}, issued by ${card.issuer}. PIN signature verified.`, outcome: 'info' });
   }
-  write((db) => { Object.assign(db.dnieRequests[r.id], { status: 'done', card, error: undefined }); });
-  return read((db) => db.dnieRequests[r.id]);
+  await write((db) => { Object.assign(db.dnieRequests[r.id], { status: 'done', card, error: undefined }); });
+  return await read((db) => db.dnieRequests[r.id]);
 }
 
 /** A completed enrolment of this client, used when the wallet is registered. */
-export function enrolledCard(clientId: string, enrollId: string) {
-  const r = read((db) => db.dnieRequests[enrollId]);
+export async function enrolledCard(clientId: string, enrollId: string) {
+  const r = await read((db) => db.dnieRequests[enrollId]);
   if (!r || r.clientId !== clientId || r.purpose !== 'enroll' || r.status !== 'done' || !r.card) throw new Error('Read your DNI first');
   return r.card;
 }

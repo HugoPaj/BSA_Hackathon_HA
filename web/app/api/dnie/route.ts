@@ -9,7 +9,7 @@ import { body, currentClient, fail, json, toClient } from '@/lib/server/session'
 export async function GET(req: Request) {
   const url = new URL(req.url);
   try {
-    return json(publicDnieRequest(dnieRequestByToken(url.searchParams.get('id') ?? '', url.searchParams.get('token') ?? '')));
+    return json(publicDnieRequest(await dnieRequestByToken(url.searchParams.get('id') ?? '', url.searchParams.get('token') ?? '')));
   } catch (e) {
     return fail((e as Error).message, 404);
   }
@@ -23,7 +23,7 @@ export async function POST(req: Request) {
     const client = await currentClient();
     if (!client) return fail('Not logged in', 401);
     if (b.purpose !== 'enroll') return fail('Unknown purpose');
-    const r = createDnieRequest({
+    const r = await createDnieRequest({
       clientId: client.clientId, purpose: 'enroll', hash: toHex(crypto.getRandomValues(new Uint8Array(32))), title: 'Add your DNI as recovery factor',
       lines: [`Swissquote client ${client.name}.`, 'Your DNI becomes Guardian B: it can approve a recovery of your wallet together with Swissquote, and never spend.', 'This first signature checks that your PIN works.'],
     });
@@ -31,7 +31,7 @@ export async function POST(req: Request) {
   }
   if (b.action === 'result') {
     try {
-      const r = dnieRequestByToken(b.id, b.token);
+      const r = await dnieRequestByToken(b.id, b.token);
       const done = await submitDnieResult(r, b, toClient(r.clientId)?.name ?? 'Swissquote client');
       return json(publicDnieRequest(done));
     } catch (e) {

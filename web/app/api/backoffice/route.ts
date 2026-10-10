@@ -14,7 +14,7 @@ export async function GET() {
     c.readContract({ address: USDC.address, abi: erc20Abi, functionName: 'balanceOf', args: [treasury as Hex] }),
     c.getBalance({ address: treasury as Hex }),
   ]);
-  const data = read((db) => ({
+  const data = await read((db) => ({
     audit: db.audit.slice(0, 200),
     wallets: Object.values(db.wallets).map((w) => ({ clientId: w.clientId, address: w.address, deployed: !!w.deployedAt, owner: w.owner.signer, guardianA: w.guardianA, guardianB: { type: w.guardianB.type, address: w.guardianB.address, label: w.guardianB.label }, proof: w.proof ?? null, previousOwners: w.previousOwners.length })),
     recoveries: Object.values(db.recoveries).sort((a, b) => b.createdAt - a.createdAt).slice(0, 20).map(publicSession),

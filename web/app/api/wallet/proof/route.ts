@@ -9,7 +9,7 @@ import { body, currentClient, fail, json } from '@/lib/server/session';
 export async function POST(req: Request) {
   const client = await currentClient();
   if (!client) return fail('Not logged in', 401);
-  const wallet = read((db) => db.wallets[client.clientId]);
+  const wallet = await read((db) => db.wallets[client.clientId]);
   if (!wallet) return fail('No wallet');
   const b = await body<{ stage: 'challenge' } | { stage: 'verify'; challengeId: string; signature: Hex }>(req);
 
@@ -24,22 +24,22 @@ export async function POST(req: Request) {
     ].join('\n');
     const hash = keccak256(toBytes(message));
     const challengeId = id();
-    write((db) => { db.stepUps[challengeId] = { id: challengeId, wallet: wallet.address, challenge: hash, callDataHash: 'proof:' + message, expires: Date.now() + 5 * 60_000 }; });
+    await write((db) => { db.stepUps[challengeId] = { id: challengeId, wallet: wallet.address, challenge: hash, callDataHash: 'proof:' + message, expires: Date.now() + 5 * 60_000 }; });
     return json({ challengeId, message, hash });
   }
 
-  const ch = read((db) => db.stepUps[b.challengeId]);
+  const ch = await read((db) => db.stepUps[b.challengeId]);
   if (!ch || !ch.callDataHash.startsWith('proof:') || ch.expires < Date.now()) return fail('Challenge expired');
   const state = await readWalletState(NODE_RPC, wallet.address);
   const isOwner = state.owners.some((o) => isAddressEqual(o as Hex, wallet.owner.signer as Hex));
   const valid = isOwner && (await isValid1271(NODE_RPC, wallet.owner.signer, ch.challenge as Hex, b.signature));
   if (!valid) {
-    audit({ actor: 'Compliance', action: 'Ownership proof rejected', wallet: wallet.address, detail: 'Signature did not verify against the current owner', outcome: 'declined' });
+    await audit({ actor: 'Compliance', action: 'Ownership proof rejected', wallet: wallet.address, detail: 'Signature did not verify against the current owner', outcome: 'declined' });
     return fail('The signature did not verify against the wallet owner');
   }
   const proof = { verifiedAt: Date.now(), signer: wallet.owner.signer, message: ch.callDataHash.slice(6), method: 'EIP-1271 isValidSignature on the owner signer contract', signature: b.signature };
-  write((db) => { db.wallets[client.clientId].proof = proof; delete db.stepUps[b.challengeId]; });
-  audit({ actor: 'Compliance', action: 'Ownership proof archived', wallet: wallet.address, detail: `Verified on-chain via EIP-1271 (signer ${wallet.owner.signer})`, outcome: 'approved' });
-  alert(wallet.address, { severity: 'success', title: 'Wallet ownership verified', body: 'Swissquote verified automatically that you control this wallet. Transfers from your Swissquote account need no manual checks.', channels: ['In-app'] });
+  await write((db) => { db.wallets[client.clientId].proof = proof; delete db.stepUps[b.challengeId]; });
+  await audit({ actor: 'Compliance', action: 'Ownership proof archived', wallet: wallet.address, detail: `Verified on-chain via EIP-1271 (signer ${wallet.owner.signer})`, outcome: 'approved' });
+  await alert(wallet.address, { severity: 'success', title: 'Wallet ownership verified', body: 'Swissquote verified automatically that you control this wallet. Transfers from your Swissquote account need no manual checks.', channels: ['In-app'] });
   return json({ proof });
 }
