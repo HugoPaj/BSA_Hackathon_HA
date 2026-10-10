@@ -21,9 +21,12 @@ export async function createDnieRequest(r: Pick<DnieRequest, 'clientId' | 'purpo
   return req;
 }
 
-/** What the phone app and the polling browser see. The token is the only credential. */
+/**
+ * What the phone app and the polling browser see. The token is the only credential. `lastError` is the last failed
+ * attempt (the request stays open for a retry); it isn't called `error` because clients read that as a failed call.
+ */
 export function publicDnieRequest(r: DnieRequest) {
-  return { id: r.id, purpose: r.purpose, title: r.title, lines: r.lines, hash: r.hash, done: r.status === 'done', error: r.error ?? null, card: r.card ?? null, expires: r.expires };
+  return { id: r.id, purpose: r.purpose, title: r.title, lines: r.lines, hash: r.hash, done: r.status === 'done', lastError: r.error ?? null, card: r.card ?? null, expires: r.expires };
 }
 
 export async function dnieRequestByToken(rid: string, token: string) {

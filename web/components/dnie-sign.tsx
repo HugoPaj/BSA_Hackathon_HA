@@ -13,7 +13,7 @@ import { issueSimDnie, signWithSimDnie, simDnie } from '@/lib/dnie-sim';
 import type { DnieCard } from '@/lib/chain';
 import { cn } from '@/utils/cn';
 
-export type DnieRequest = { id: string; token: string; title: string; lines: string[]; hash: `0x${string}`; done: boolean; error: string | null; card: DnieCard | null };
+export type DnieRequest = { id: string; token: string; title: string; lines: string[]; hash: `0x${string}`; done: boolean; lastError: string | null; card: DnieCard | null };
 
 export const APP_PACKAGE = 'ch.swissquote.idsigner';
 
@@ -63,7 +63,7 @@ export function DnieSign({ create, onDone, intro }: { create: () => Promise<Dnie
         const r = await api<Omit<DnieRequest, 'token'>>(`/api/dnie?id=${reqId}&token=${reqToken}`);
         if (stopped) return;
         if (r.done) { if (!doneRef.current) { doneRef.current = true; onDoneRef.current({ ...r, token: reqToken }); } return; }
-        setReq((cur) => (cur && cur.error !== r.error ? { ...cur, error: r.error } : cur));
+        setReq((cur) => (cur && cur.lastError !== r.lastError ? { ...cur, lastError: r.lastError } : cur));
       } catch (e) { if (!stopped) setError((e as Error).message); }
       if (!stopped) t = setTimeout(poll, 2000);
     };
@@ -106,7 +106,7 @@ export function DnieSign({ create, onDone, intro }: { create: () => Promise<Dnie
       <div className="flex items-center justify-center gap-2 text-label-sm text-text-sub-600">
         <RiLoader4Line className="size-4 animate-spin text-primary-base" />Waiting for your DNI…
       </div>
-      {req.error && <Alert.Root status="error" variant="lighter" size="small"><Alert.Icon />{req.error}</Alert.Root>}
+      {req.lastError && <Alert.Root status="error" variant="lighter" size="small"><Alert.Icon />{req.lastError}</Alert.Root>}
 
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-stroke-soft-200 pt-3">
         <a href="/swissquote-id.apk" className="inline-flex items-center gap-1 text-label-xs text-text-soft-400 hover:text-text-sub-600"><RiAndroidLine className="size-4" />Get the Android app</a>

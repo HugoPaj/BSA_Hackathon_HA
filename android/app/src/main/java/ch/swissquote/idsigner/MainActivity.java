@@ -133,7 +133,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         io.execute(() -> {
             try {
                 JSONObject r = new JSONObject(http("GET", server + "/api/dnie?id=" + Uri.encode(reqId) + "&token=" + Uri.encode(token), null));
-                if (r.has("error")) throw new Exception(r.getString("error"));
+                if (!r.isNull("error")) throw new Exception(r.getString("error"));
                 StringBuilder lines = new StringBuilder();
                 JSONArray arr = r.optJSONArray("lines");
                 for (int i = 0; arr != null && i < arr.length(); i++) lines.append(i > 0 ? "\n" : "").append(arr.getString(i));
@@ -204,7 +204,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
             body.put("certificate", Base64.encodeToString(cert.getEncoded(), Base64.NO_WRAP));
             if (intermediate != null) body.put("intermediate", Base64.encodeToString(intermediate.getEncoded(), Base64.NO_WRAP));
             JSONObject r = new JSONObject(http("POST", server + "/api/dnie", body.toString()));
-            if (r.has("error")) throw new Exception(r.getString("error"));
+            if (!r.isNull("error")) throw new Exception(r.getString("error"));
             ui.post(() -> done("Done. Go back to your browser: the wallet has your DNI signature."));
         } catch (BadPinException e) {
             fail("Wrong PIN. " + e.getRemainingRetries() + " attempts left before the card locks.");
