@@ -1,0 +1,54 @@
+import { isAddressEqual, type Hex } from 'viem';
+import { NODE_RPC } from '@/lib/config';
+import { counterfactualAddress, passkeySignerAddress, readWalletState, type GuardianB } from '@/lib/chain';
+import { audit, publicSession, read, write, type WalletRecord } from '@/lib/server/db';
+import { guardianAccount } from '@/lib/server/keys';
+import { body, currentClient, fail, json } from '@/lib/server/session';
+import { syncRecoveries } from '@/lib/server/recovery';
+
+export async function GET() {
+  const client = await currentClient();
+  if (!client) return fail('Not logged in', 401);
+  let wallet = read((db) => db.wallets[client.clientId]);
+  if (!wallet) return json({ wallet: null });
+  const state = await readWalletState(NODE_RPC, wallet.address);
+  if (state.deployed && !wallet.deployedAt) wallet = write((db) => { db.wallets[client.clientId].deployedAt = Date.now(); return db.wallets[client.clientId]; });
+  await syncRecoveries(wallet, state);
+  wallet = read((db) => db.wallets[client.clientId]);
+  const recovery = publicSession(read((db) => Object.values(db.recoveries).filter((r) => r.wallet === wallet.address).sort((a, b) => b.createdAt - a.createdAt)[0]));
+  return json({ wallet, state, recovery });
+}
+
+type Register = {
+  owner: { x: bigint; y: bigint; credentialId: string };
+  guardianB: GuardianB & { label: string };
+  bankAssisted: boolean;
+  contact?: string;
+};
+
+export async function POST(req: Request) {
+  const client = await currentClient();
+  if (!client) return fail('Not logged in', 401);
+  const existing = read((db) => db.wallets[client.clientId]);
+  if (existing && (existing.deployedAt || (await readWalletState(NODE_RPC, existing.address)).deployed)) return fail('This client already has a wallet. Its guardians can only change on-chain, signed by the owner passkey.', 409);
+  const r = await body<Register>(req);
+  const address = counterfactualAddress(r.owner);
+  if (r.guardianB.type === 'passkey' && !isAddressEqual(r.guardianB.address as Hex, passkeySignerAddress(r.guardianB))) return fail('Recovery passkey address mismatch');
+  if (!r.bankAssisted && !/^0x[0-9a-fA-F]{40}$/.test(r.contact ?? '')) return fail('A trusted contact address is needed when bank-assisted recovery is off');
+  const guardianA: WalletRecord['guardianA'] = r.bankAssisted
+    ? { type: 'swissquote', address: guardianAccount().address, label: 'Swissquote (bank-assisted recovery)' }
+    : { type: 'contact', address: r.contact!, label: 'Trusted contact' };
+  const record: WalletRecord = {
+    clientId: client.clientId,
+    address,
+    createdAt: Date.now(),
+    owner: { ...r.owner, signer: passkeySignerAddress(r.owner) },
+    previousOwners: [],
+    guardianA,
+    guardianB: r.guardianB,
+    bankAssisted: r.bankAssisted,
+  };
+  write((db) => { db.wallets[client.clientId] = record; });
+  audit({ actor: 'Wallet service', action: 'Wallet registered', wallet: address, detail: `Client ${client.clientId}. Guardian A: ${guardianA.label}. Guardian B: ${r.guardianB.label}.`, outcome: 'info' });
+  return json({ wallet: record });
+}
