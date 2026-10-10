@@ -156,7 +156,7 @@ function FactorStep({ factor, setFactor, onNext }: { factor: Factor; setFactor: 
 
       {!factor && choice === 'passkey' && (
         <div className="space-y-3">
-          <Alert.Root status="information" variant="lighter" size="small"><Alert.Icon />Your browser will ask where to save it. Choose <b>&nbsp;“Use another device”&nbsp;</b> and scan the QR code with your other phone or laptop, or insert a security key.</Alert.Root>
+          <Alert.Root status="information" variant="lighter" size="small"><Alert.Icon /><span>Your browser will ask where to save it. Choose <b>“Use another device”</b> and scan the QR code with your other phone or laptop, or insert a security key.</span></Alert.Root>
           <FancyButton.Root variant="neutral" className="h-12 w-full" disabled={busy} onClick={async () => {
             setBusy(true); setError(null);
             try {
@@ -235,7 +235,7 @@ function SettingsStep({ bankAssisted, setBankAssisted, contact, setContact, fact
           <div className="mt-1 text-paragraph-xs text-text-sub-600">Something only you have.</div>
         </div>
       </div>
-      <div className="flex items-center gap-2 rounded-2xl bg-warning-lighter p-4 text-paragraph-sm text-text-strong-950"><RiTimeLine className="size-5 shrink-0 text-warning-dark" />Then a {RECOVERY_DELAY_PRODUCTION} safety delay ({RECOVERY_DELAY_LABEL} in this demo). Your passkey can cancel at any time.</div>
+      <div className="flex items-center gap-2 rounded-2xl bg-warning-lighter p-4 text-paragraph-sm text-text-strong-950"><RiTimeLine className="size-5 shrink-0 text-warning-dark" />Then a safety delay of {RECOVERY_DELAY_PRODUCTION} ({RECOVERY_DELAY_LABEL} in this demo). Your passkey can cancel at any time.</div>
       <div className="flex items-start justify-between gap-4 rounded-2xl p-4 ring-1 ring-inset ring-stroke-soft-200">
         <div>
           <div className="text-label-sm text-text-strong-950">Bank-assisted recovery</div>
@@ -262,17 +262,20 @@ function CreateStep({ owner, factor, bankAssisted, contact, onNext }: { owner: P
   const flow = useTxFlow({ wallet, deployed: false });
   const [prepError, setPrepError] = useState<string | null>(null);
 
+  // Registers the wallet (idempotent until deployed) and asks Swissquote to check and sponsor the setup batch.
+  const prepare = async () => {
+    try {
+      const { swissquoteGuardian } = await api<{ swissquoteGuardian: string }>('/api/config');
+      await api('/api/wallet', { owner, guardianB: factor, bankAssisted, contact: bankAssisted ? undefined : contact });
+      const guardianA = bankAssisted ? swissquoteGuardian : contact;
+      await flow.prepare(setupTransactions(address, guardianA, factor), { type: 'deploy', title: 'Wallet created, recovery switched on' });
+    } catch (e) { setPrepError(friendly(e)); }
+  };
   useEffect(() => {
-    (async () => {
-      try {
-        const [{ swissquoteGuardian }] = await Promise.all([api<{ swissquoteGuardian: string }>('/api/config')]);
-        await api('/api/wallet', { owner, guardianB: factor, bankAssisted, contact: bankAssisted ? undefined : contact });
-        const guardianA = bankAssisted ? swissquoteGuardian : contact;
-        await flow.prepare(setupTransactions(address, guardianA, factor), { type: 'deploy', title: 'Wallet created, recovery switched on' });
-      } catch (e) { setPrepError((e as Error).message); }
-    })();
+    void Promise.resolve().then(prepare); // state updates happen after the first await, not during the effect
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  const failed = !!prepError || flow.phase === 'error';
 
   useEffect(() => {
     if (flow.phase === 'done') {
@@ -299,7 +302,7 @@ function CreateStep({ owner, factor, bankAssisted, contact, onNext }: { owner: P
           <div key={k as string} className="flex items-center justify-between gap-3 px-3 py-2.5 text-paragraph-sm"><span className="text-text-sub-600">{k}</span><span className="text-right text-label-sm text-text-strong-950">{v}</span></div>
         ))}
       </div>
-      {flow.phase !== 'done' && <ChecksList evaluation={flow.evaluation} loading={!flow.evaluation} />}
+      {flow.phase !== 'done' && (flow.evaluation || !failed) && <ChecksList evaluation={flow.evaluation} loading={!flow.evaluation} />}
       {prepError && <Alert.Root status="error" variant="lighter" size="small"><Alert.Icon />{prepError}</Alert.Root>}
       {flow.error && <Alert.Root status="error" variant="lighter" size="small"><Alert.Icon />{flow.error}</Alert.Root>}
       {flow.phase === 'done' ? (
@@ -311,12 +314,13 @@ function CreateStep({ owner, factor, bankAssisted, contact, onNext }: { owner: P
           <Button.Root className="h-11 w-full" onClick={onNext}>Continue<Button.Icon as={RiArrowRightLine} /></Button.Root>
         </div>
       ) : (
-        <FancyButton.Root variant="primary" className="h-12 w-full" disabled={busy || flow.phase !== 'review'} onClick={() => flow.confirm()}>
+        <FancyButton.Root variant="primary" className="h-12 w-full" disabled={busy || (!failed && flow.phase !== 'review')}
+          // Retry from the failed step: re-check and re-sponsor if that never succeeded, otherwise sign again.
+          onClick={() => { if (failed && !flow.evaluation) { setPrepError(null); prepare(); } else flow.confirm(); }}>
           <FancyButton.Icon as={RiFingerprintLine} />
-          {flow.phase === 'signing' ? 'Approve with your passkey…' : flow.phase === 'submitting' || flow.phase === 'confirming' ? 'Deploying…' : flow.phase === 'error' ? 'Try again' : 'Create wallet'}
+          {flow.phase === 'signing' ? 'Approve with your passkey…' : flow.phase === 'submitting' || flow.phase === 'confirming' ? 'Deploying…' : failed ? 'Try again' : 'Create wallet'}
         </FancyButton.Root>
       )}
-      {flow.phase === 'error' && <Button.Root variant="neutral" mode="ghost" className="w-full" onClick={() => flow.confirm()}>Retry signing</Button.Root>}
     </Card>
   );
 }

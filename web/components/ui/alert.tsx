@@ -4,7 +4,7 @@ import * as React from 'react';
 import { tv, type VariantProps, type ClassValue } from '@/utils/tv';
 import { recursiveCloneChildren } from '@/utils/recursive-clone-children';
 import type { PolymorphicComponentProps } from '@/utils/polymorphic';
-import { RiCloseLine } from '@remixicon/react';
+import { RiAlertFill, RiCheckboxCircleFill, RiCloseLine, RiErrorWarningFill, RiInformationFill, RiMagicFill } from '@remixicon/react';
 
 const ALERT_ROOT_NAME = 'AlertRoot';
 const ALERT_ICON_NAME = 'AlertIcon';
@@ -266,6 +266,15 @@ const AlertRoot = React.forwardRef<HTMLDivElement, AlertProps>(
 );
 AlertRoot.displayName = ALERT_ROOT_NAME;
 
+// Without an explicit `as`, show the status icon (an empty div would break the wrapper's svg-based grid).
+const STATUS_ICONS = {
+  error: RiErrorWarningFill,
+  warning: RiAlertFill,
+  success: RiCheckboxCircleFill,
+  information: RiInformationFill,
+  feature: RiMagicFill,
+};
+
 function AlertIcon<T extends React.ElementType>({
   size,
   variant,
@@ -273,7 +282,7 @@ function AlertIcon<T extends React.ElementType>({
   className,
   as,
 }: PolymorphicComponentProps<T, AlertSharedProps>) {
-  const Component = as || 'div';
+  const Component = as || STATUS_ICONS[status ?? 'information'];
   const { icon } = alertVariants({ size, variant, status });
 
   return <Component className={icon({ class: className })} />;

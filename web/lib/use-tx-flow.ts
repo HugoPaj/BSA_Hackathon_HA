@@ -39,7 +39,7 @@ export function useTxFlow(opts: { wallet: Pick<WalletRecord, 'address' | 'owner'
       setPhase(r.evaluation.decision === 'decline' ? 'declined' : 'review');
       return r.evaluation;
     } catch (e) {
-      setError((e as Error).message);
+      setError(friendly(e));
       setPhase('error');
       return null;
     }
@@ -108,6 +108,7 @@ export function friendly(e: unknown) {
   const msg = String(err?.cause?.message ?? err?.message ?? e);
   if (err?.name === 'NotAllowedError' || /not allowed|cancel|abort/i.test(msg)) return 'The passkey prompt was cancelled or timed out.';
   if (/AA21|prefund|insufficient funds/i.test(msg)) return 'Your wallet has no ETH to pay its own gas. Swissquote only sponsors transactions that pass its checks.';
+  if (/429|too many requests|rate limit|rpc call failed|fetch failed|network ?error/i.test(msg)) return 'The Base Sepolia network did not answer (the public node may be rate-limiting). Close this and try again in a few seconds.';
   if (/estimateUserOperationGas|revert/i.test(msg)) return 'The network simulation says this transaction would fail.';
   return msg;
 }

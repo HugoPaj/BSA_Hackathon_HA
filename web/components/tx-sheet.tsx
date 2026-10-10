@@ -34,6 +34,9 @@ export function TxSheet({ open, onOpenChange, flow, title, headline, txs, guardi
   const busy = ['preparing', 'stepup', 'signing', 'submitting', 'confirming'].includes(phase);
   const stepUp = evaluation?.decision === 'step-up';
   const total = evaluation ? evaluation.outgoing + evaluation.fee : 0n;
+  // A failed simulation means the transaction would revert whoever pays the gas, so there is no self-paid fallback.
+  const simFail = evaluation?.checks.find((c) => c.id === 'simulation' && c.status === 'fail');
+  const wouldRevert = !!simFail;
 
   return (
     <Sheet open={open} onOpenChange={(o) => { onOpenChange(o); if (!o && phase === 'done') onDone?.(); }} title={title} dismissable={!busy}>
@@ -52,7 +55,7 @@ export function TxSheet({ open, onOpenChange, flow, title, headline, txs, guardi
       ) : (
         <div className="space-y-4">
           {headline}
-          <ChecksList evaluation={evaluation} loading={phase === 'preparing' && !evaluation} />
+          {(evaluation || phase !== 'error') && <ChecksList evaluation={evaluation} loading={phase === 'preparing' && !evaluation} />}
 
           {evaluation && (
             <div className="divide-y divide-stroke-soft-200 rounded-xl ring-1 ring-inset ring-stroke-soft-200">
@@ -80,15 +83,24 @@ export function TxSheet({ open, onOpenChange, flow, title, headline, txs, guardi
           {phase === 'declined' && evaluation && (
             <Alert.Root status="error" variant="lighter" size="small">
               <Alert.Icon />
-              <div>
-                <div className="text-label-sm">Swissquote won&apos;t sponsor this</div>
-                <div className="mt-0.5">{evaluation.reason}. You keep full control: you can still send it and pay the network fee yourself in ETH.</div>
-              </div>
+              {evaluation.reason === simFail?.detail ? (
+                <div>
+                  <div className="text-label-sm">This transaction would fail</div>
+                  <div className="mt-0.5">{simFail?.detail}. Nothing was signed or sent.</div>
+                </div>
+              ) : (
+                <div>
+                  <div className="text-label-sm">Swissquote won&apos;t sponsor this</div>
+                  <div className="mt-0.5">{evaluation.reason}. {simFail ? `It would also fail on-chain: ${simFail.detail}.` : 'You keep full control: you can still send it and pay the network fee yourself in ETH.'}</div>
+                </div>
+              )}
             </Alert.Root>
           )}
           {error && phase === 'error' && <Alert.Root status="error" variant="lighter" size="small"><Alert.Icon />{error}</Alert.Root>}
 
-          {stepUp && phase === 'review' && guardianType === 'card' && !card && <CardUnlock onUnlocked={setCard} purpose="Confirm this high-value transfer" />}
+          {stepUp && phase === 'review' && guardianType === 'card' && (card
+            ? <Alert.Root status="success" variant="lighter" size="small"><Alert.Icon />Recovery card unlocked. It co-signs when you confirm.</Alert.Root>
+            : <CardUnlock onUnlocked={setCard} purpose="Confirm this high-value transfer" />)}
 
           <StatusLine phase={phase} stepUp={stepUp} guardianType={guardianType} />
 
@@ -103,12 +115,12 @@ export function TxSheet({ open, onOpenChange, flow, title, headline, txs, guardi
               </p>
             </div>
           )}
-          {(phase === 'declined' || (phase === 'error' && evaluation?.decision === 'decline')) && (
+          {!wouldRevert && (phase === 'declined' || (phase === 'error' && evaluation?.decision === 'decline')) && (
             <Button.Root variant="neutral" mode="stroke" className="w-full" onClick={() => flow.payOwnGas(txs)}>
               <Button.Icon as={RiArrowRightUpLine} />Send anyway, I pay gas in ETH
             </Button.Root>
           )}
-          {phase === 'error' && evaluation?.decision !== 'decline' && (
+          {((phase === 'error' && evaluation?.decision !== 'decline') || (phase === 'declined' && wouldRevert)) && (
             <Button.Root variant="neutral" mode="stroke" className="w-full" onClick={() => onOpenChange(false)}>Close</Button.Root>
           )}
         </div>

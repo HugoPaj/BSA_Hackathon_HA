@@ -30,7 +30,7 @@ try {
   await page.goto(BASE + '/', { waitUntil: 'networkidle2' });
   await shot('landing');
   await clickText('Log in');
-  await waitText('Total value');
+  await waitText('Buying power');
   // fresh demo state
   await page.evaluate(() => fetch('/api/demo/reset', { method: 'POST', body: '{}' }));
   await page.goto(BASE + '/wallet/new', { waitUntil: 'networkidle2' });
@@ -40,6 +40,8 @@ try {
   await waitText('Passkey created');
   await shot('onboarding-passkey');
   await clickText('Continue');
+  await waitText('Use another device');
+  await shot('onboarding-recovery');
   await clickText('Add recovery passkey');
   await waitText('added');
   await clickText('Continue');
@@ -57,7 +59,7 @@ try {
   await waitText('Ownership verified and archived');
   await shot('onboarding-proof');
   await clickText('Open my wallet');
-  await waitText('Self-custody balance');
+  await waitText('Self-custody wallet');
   await new Promise((r) => setTimeout(r, 1500));
   await shot('wallet-home');
 

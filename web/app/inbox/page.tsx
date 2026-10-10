@@ -29,7 +29,7 @@ function Inbox() {
   return (
     <div className="mx-auto max-w-[720px]">
       <PageTitle title="E-banking inbox" subtitle="Security alerts about your wallet. Each one also goes out by push and e-mail, so a thief who controls one channel cannot hide them." />
-      <div className="rounded-3xl bg-bg-white-0 ring-1 ring-inset ring-stroke-soft-200">
+      <div className="overflow-hidden rounded-3xl bg-bg-white-0 ring-1 ring-stroke-soft-200">
         {!data?.length && <div className="flex flex-col items-center gap-2 p-10 text-paragraph-sm text-text-soft-400"><RiMailLine className="size-8" />No messages yet.</div>}
         <div className="divide-y divide-stroke-soft-200">
           {data?.map((a) => {

@@ -8,6 +8,7 @@ import * as Hint from '@/components/ui/hint';
 import { RequireLogin } from '@/components/require-login';
 import { PageTitle } from '@/components/page-title';
 import { TxSheet } from '@/components/tx-sheet';
+import { ReplacedDeviceNotice } from '@/components/replaced-device';
 import { useWallet } from '@/lib/hooks';
 import { useConfig } from '@/lib/use-config';
 import { useTxFlow } from '@/lib/use-tx-flow';
@@ -42,11 +43,13 @@ function SendForm({ data, cfg, to, setTo, amountText, setAmountText, open, setOp
   const validTo = /^0x[0-9a-fA-F]{40}$/.test(to);
   const contact = CONTACTS.find((c) => c.address.toLowerCase() === to.toLowerCase());
   const txs = useMemo(() => (validTo && amount && cfg ? [transferTx(to, amount), transferTx(cfg.treasury, SERVICE_FEE)] : []), [validTo, amount, cfg, to]);
+  const insufficient = !!amount && amount + SERVICE_FEE > balance;
   const canReview = validTo && !!amount && amount > 0n && !!cfg;
 
   return (
     <div className="mx-auto max-w-[560px]">
       <PageTitle title="Send USDC" subtitle="Signed by your passkey. Swissquote sponsors the network fee when the transfer passes its checks." back="/wallet" />
+      <div className="mb-4 empty:hidden"><ReplacedDeviceNotice wallet={wallet} /></div>
       <div className="space-y-6 rounded-3xl bg-bg-white-0 p-5 ring-1 ring-inset ring-stroke-soft-200 md:p-6">
         <div className="space-y-2">
           <Label.Root>Recipient</Label.Root>
@@ -65,14 +68,15 @@ function SendForm({ data, cfg, to, setTo, amountText, setAmountText, open, setOp
         <div className="space-y-2">
           <div className="flex items-baseline justify-between"><Label.Root htmlFor="amt">Amount</Label.Root><button className="text-label-xs text-primary-base" onClick={() => setAmountText(formatUsdc(balance > SERVICE_FEE ? balance - SERVICE_FEE : 0n).replace(/'/g, ''))}>Balance {formatUsdc(balance)} USDC</button></div>
           <div className="flex items-baseline gap-2 rounded-2xl bg-bg-weak-50 px-4 py-3 ring-1 ring-inset ring-stroke-soft-200 focus-within:ring-primary-base">
-            <input id="amt" inputMode="decimal" placeholder="0.00" value={amountText} onChange={(e) => setAmountText(e.target.value)} className="w-full bg-transparent text-[32px] font-medium tracking-[-0.02em] text-text-strong-950 outline-none placeholder:text-text-disabled-300" />
+            <input id="amt" inputMode="decimal" placeholder="0.00" value={amountText} onChange={(e) => setAmountText(e.target.value.replace(/,/g, '.').replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1'))} className="w-full bg-transparent text-[32px] font-medium tracking-[-0.02em] text-text-strong-950 outline-none placeholder:text-text-disabled-300" />
             <span className="text-label-lg text-text-soft-400">USDC</span>
           </div>
           <div className="flex justify-between text-paragraph-xs text-text-soft-400">
             <span>{amount ? `≈ ${usdcToChf(amount)} CHF` : ' '}</span>
             <span>+ {formatUsdc(SERVICE_FEE)} USDC Swissquote fee, gas included</span>
           </div>
-          {amount && amount >= STEP_UP_THRESHOLD && <Hint.Root className="text-primary-dark">Above {formatUsdc(STEP_UP_THRESHOLD)} USDC your {wallet.guardianB.type === 'passkey' ? 'recovery device' : 'recovery card'} confirms too.</Hint.Root>}
+          {insufficient && <Hint.Root hasError>Not enough USDC: this amount plus the {formatUsdc(SERVICE_FEE)} USDC fee is more than your balance, so the transfer would fail.</Hint.Root>}
+          {!insufficient && amount && amount >= STEP_UP_THRESHOLD && <Hint.Root className="text-primary-dark">Above {formatUsdc(STEP_UP_THRESHOLD)} USDC your {wallet.guardianB.type === 'passkey' ? 'recovery device' : 'recovery card'} confirms too.</Hint.Root>}
         </div>
 
         <Button.Root className="h-12 w-full" disabled={!canReview} onClick={() => {

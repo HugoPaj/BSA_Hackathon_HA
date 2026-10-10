@@ -25,6 +25,7 @@
     "@remixicon/react": "^4.9.0",
     "abstractionkit": "^0.4.3",
     "clsx": "^2.1.1",
+    "jsqr": "^1.4.0",
     "merge-refs": "^2.0.0",
     "next": "16.4.0",
     "qrcode.react": "^4.2.0",

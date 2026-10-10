@@ -1,19 +1,27 @@
 'use client';
 import Link from 'next/link';
+import { useEffect, useRef, useState } from 'react';
 import {
-  RiArrowRightSLine, RiBankLine, RiCoinsLine, RiExchangeLine, RiFileList3Line, RiFingerprintLine, RiGasStationLine,
-  RiLineChartLine, RiShieldCheckFill, RiShieldKeyholeLine, RiWallet3Line,
+  RiArrowLeftRightLine, RiArrowRightSLine, RiBankCardLine, RiCoinsLine, RiExchangeLine, RiFingerprintLine, RiGasStationLine,
+  RiHandCoinLine, RiLineChartLine, RiListUnordered, RiScales3Line, RiShieldCheckFill, RiShieldKeyholeLine, RiWallet3Line,
 } from '@remixicon/react';
 import * as Button from '@/components/ui/button';
-import * as Badge from '@/components/ui/badge';
 import { LoginCard } from '@/components/login-card';
 import { useSession } from '@/components/session';
 import { SwissFlag } from '@/components/brand';
-import { useWallet } from '@/lib/hooks';
-import { formatNumber, formatUsdc, usdcToChf, toUnits } from '@/lib/format';
-import { USDC_CHF } from '@/lib/config';
-
-const MOCK_ACCOUNT = { trading: 55050.01, assets: 12000, cryptoCustodial: 10150.01, cash: 31000, buyingPower: 1000 };
+import { AreaChart, Sparkline } from '@/components/charts';
+import { FundSheet } from '@/components/fund-sheet';
+import { ChangePill, InstrumentLogo, InstrumentRow, PeriodControl, formatChartTime } from '@/components/market-ui';
+import { QuickActions } from '@/components/quick-actions';
+import { TradeSheet } from '@/components/trade-sheet';
+import { WalletSparkline } from '@/components/wallet-chart';
+import { useActivity, useWallet } from '@/lib/hooks';
+import { formatNumber, formatUsdc, usdcToChf } from '@/lib/format';
+import {
+  INSTRUMENTS, PERIOD_LABEL, formatPct, formatPrice, formatSigned, instrument, portfolioSeries, prevClose, priceSeries, useMarket, valuation,
+  type Instrument, type MarketState, type Period, type Point,
+} from '@/lib/market';
+import { cn } from '@/utils/cn';
 
 export default function Home() {
   const { client, ready } = useSession();
@@ -60,24 +68,26 @@ function Landing() {
 }
 
 function Dashboard() {
-  const { data } = useWallet(10000);
-  const { client } = useSession();
+  const { data, loading, refresh } = useWallet(10000);
+  const activity = useActivity(15000);
+  const s = useMarket();
+  const [fundOpen, setFundOpen] = useState(false);
   const wallet = data?.wallet;
+  const deployed = !!wallet?.deployedAt;
+  // Until the first wallet fetch resolves we don't know whether it exists, so render neither the
+  // setup banner nor the wallet card; otherwise set-up users see the banner flash on every load.
+  const unknown = loading && !data;
   const usdc = data?.state?.usdc ?? 0n;
-  const walletChf = toUnits(usdc) * USDC_CHF;
-  const total = MOCK_ACCOUNT.trading + walletChf;
+  const onFund = deployed ? () => setFundOpen(true) : undefined;
+  const actions = [
+    { icon: RiArrowLeftRightLine, label: 'Open orders', href: '/trade/orders', badge: s.portfolio.orders.filter((o) => o.status === 'open').length },
+    { icon: RiListUnordered, label: 'Transactions', href: '/trade/orders?tab=transactions' },
+    { icon: RiHandCoinLine, label: 'Fund wallet', href: onFund ? undefined : '/wallet/new', onClick: onFund },
+  ];
 
   return (
-    <div className="mx-auto max-w-[1080px] space-y-8">
-      <section className="text-center">
-        <div className="text-paragraph-sm text-text-sub-600">Total value</div>
-        <div className="mt-1 text-[34px] font-medium tracking-[-0.02em] text-text-strong-950 md:text-[44px]">
-          {formatNumber(total)} <span className="text-[0.55em] text-text-soft-400">CHF</span>
-        </div>
-        <div className="mt-1 text-paragraph-xs text-text-soft-400">Welcome back, {client?.name.split(' ')[0]}. Trading account figures are mock data.</div>
-      </section>
-
-      {!wallet || !wallet.deployedAt ? (
+    <div className="mx-auto max-w-[1080px] space-y-6">
+      {!unknown && !deployed && (
         <section className="relative overflow-hidden rounded-3xl bg-primary-base p-6 text-static-white md:p-10">
           <div className="relative z-10 max-w-xl">
             <div className="text-subheading-xs uppercase tracking-wider text-static-white/80">New</div>
@@ -89,46 +99,36 @@ function Dashboard() {
           </div>
           <RiWallet3Line className="pointer-events-none absolute -bottom-10 -right-6 size-64 text-static-white/10 md:size-80" />
         </section>
-      ) : (
-        <Link href="/wallet" className="block rounded-3xl bg-bg-white-0 p-5 shadow-regular-xs ring-1 ring-inset ring-stroke-soft-200 transition hover:shadow-regular-md md:p-6">
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-2 text-label-sm text-text-sub-600"><RiWallet3Line className="size-[18px] text-primary-base" />Self-custody wallet</div>
-              <div className="mt-2 text-title-h4 text-text-strong-950">{formatUsdc(usdc)} <span className="text-label-lg text-text-soft-400">USDC</span></div>
-              <div className="text-paragraph-sm text-text-sub-600">≈ {usdcToChf(usdc)} CHF <SwissFlag /></div>
-            </div>
-            <RiArrowRightSLine className="size-6 text-text-soft-400" />
-          </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Badge.Root color="green" variant="lighter" size="medium"><Badge.Icon as={RiShieldCheckFill} />Only you can spend</Badge.Root>
-            {data?.recovery?.status === 'pending' && <Badge.Root color="yellow" variant="lighter" size="medium">Recovery pending</Badge.Root>}
-            {wallet.proof && <Badge.Root color="blue" variant="lighter" size="medium">Ownership verified</Badge.Root>}
-          </div>
-        </Link>
       )}
 
-      <section>
-        <div className="mb-3 flex items-baseline justify-between">
-          <h3 className="text-label-md text-text-strong-950">Trading 2162953</h3>
-          <span className="text-paragraph-xs text-text-soft-400">Swissquote custody · mock</span>
-        </div>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          {[
-            { icon: RiLineChartLine, label: 'Assets', v: MOCK_ACCOUNT.assets },
-            { icon: RiCoinsLine, label: 'Crypto (custodial)', v: MOCK_ACCOUNT.cryptoCustodial },
-            { icon: RiBankLine, label: 'Cash', v: MOCK_ACCOUNT.cash },
-            { icon: RiFileList3Line, label: 'Buying power', v: MOCK_ACCOUNT.buyingPower },
-          ].map((c) => (
-            <div key={c.label} className="rounded-2xl bg-bg-white-0 p-4 ring-1 ring-inset ring-stroke-soft-200">
-              <div className="flex items-center justify-between text-paragraph-xs text-text-sub-600">
-                <span className="flex items-center gap-1.5"><c.icon className="size-4 text-primary-base" />{c.label}</span>
-                <RiArrowRightSLine className="size-4 text-text-soft-400" />
+      <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+        <TradingCard s={s} />
+        <aside className="flex flex-col gap-6">
+          {unknown && <div className="min-h-[220px] flex-1 animate-pulse rounded-3xl bg-bg-weak-50 ring-1 ring-inset ring-stroke-soft-200" />}
+          {deployed && wallet && (
+            <Link href="/wallet" className="flex flex-1 flex-col rounded-3xl bg-bg-white-0 p-5 shadow-regular-xs ring-1 ring-inset ring-stroke-soft-200 transition hover:shadow-regular-md">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-2 text-label-sm text-text-sub-600"><RiWallet3Line className="size-[18px] text-primary-base" />Self-custody wallet</span>
+                <RiArrowRightSLine className="size-5 text-text-soft-400" />
               </div>
-              <div className="mt-2 text-label-lg text-text-strong-950">{formatNumber(c.v)}</div>
-            </div>
-          ))}
-        </div>
-      </section>
+              <div className="mt-3 text-title-h4 tabular-nums text-text-strong-950">{formatUsdc(usdc)} <span className="text-label-lg text-text-soft-400">USDC</span></div>
+              <div className="text-paragraph-sm text-text-sub-600">≈ {usdcToChf(usdc)} CHF</div>
+              <WalletSparkline activity={activity.data} balance={usdc} className="mt-3 min-h-14 w-full flex-1" />
+              {data?.recovery?.status === 'pending'
+                ? <div className="mt-auto pt-3 text-label-sm text-warning-dark">Recovery pending · review it</div>
+                : <div className="mt-auto flex items-center gap-1 pt-3 text-label-sm text-success-base"><RiShieldCheckFill className="size-4" />Only you can spend</div>}
+            </Link>
+          )}
+          <section className="rounded-3xl bg-bg-white-0 p-5 ring-1 ring-inset ring-stroke-soft-200">
+            <h2 className="mb-4 text-label-md text-text-strong-950">Quick actions</h2>
+            <QuickActions actions={actions} className="md:grid md:gap-0 md:px-0" />
+          </section>
+          {/* The wallet card takes the space once it exists; until then the watchlist fills the column. */}
+          {!unknown && !deployed && <Watchlist s={s} limit={4} className="flex-1" />}
+        </aside>
+      </div>
+
+      <CryptoStrip s={s} />
 
       <section className="grid gap-3 md:grid-cols-2">
         <div className="rounded-2xl bg-information-lighter p-5 text-paragraph-sm text-text-strong-950">
@@ -146,6 +146,141 @@ function Dashboard() {
           </div>
         </div>
       </section>
+
+      {deployed && <FundSheet open={fundOpen} onOpenChange={setFundOpen} verified={!!wallet?.proof} onDone={() => { refresh(); activity.refresh(); }} />}
     </div>
   );
+}
+
+const PORTFOLIO_PERIODS: Period[] = ['1W', '1M', '6M', '1Y', 'All'];
+
+function TradingCard({ s }: { s: MarketState }) {
+  const [period, setPeriod] = useState<Period>('1M');
+  const [scrub, setScrub] = useState<Point | null>(null);
+  const v = valuation(s);
+  const series = portfolioSeries(s, period);
+  const tone = (n: number) => (n >= 0 ? 'text-success-base' : 'text-error-base');
+  // Change over the selected period, or up to the scrubbed point.
+  const start = series[0].v;
+  const change = (scrub ?? series[series.length - 1]).v - start;
+
+  const tiles = [
+    { icon: RiLineChartLine, label: 'Assets', v: v.assets, href: '/trade?tab=portfolio' },
+    { icon: RiCoinsLine, label: 'Crypto', v: v.crypto, href: '/trade?tab=portfolio' },
+    { icon: RiBankCardLine, label: 'Cash', v: v.cash, href: '/trade/orders?tab=transactions' },
+    { icon: RiScales3Line, label: 'Buying power', v: v.buyingPower, href: '/trade' },
+  ];
+
+  return (
+    <section className="flex flex-col rounded-3xl bg-bg-white-0 p-5 shadow-regular-xs ring-1 ring-inset ring-stroke-soft-200 md:p-6">
+      <Link href="/trade?tab=portfolio" className="flex items-center justify-between text-label-md text-text-strong-950 hover:text-primary-base">
+        Trading 2162953 <RiArrowRightSLine className="size-5 text-text-soft-400" />
+      </Link>
+      <div className="mt-3 flex items-center gap-2 text-[28px] font-medium tabular-nums leading-tight tracking-[-0.01em] text-text-strong-950 md:text-[32px]">
+        {formatNumber(scrub?.v ?? v.total)} <SwissFlag />
+      </div>
+      <div className="mt-1 min-h-[42px] text-paragraph-sm text-text-sub-600">
+        <div>
+          <span className={cn('text-label-sm', tone(change))}>{formatSigned(change)} CHF {change >= 0 ? '▲' : '▼'} {formatPct(change / start)}</span>{' '}
+          {scrub ? `since ${formatChartTime(period)(series[0].t)}` : PERIOD_LABEL[period]}
+        </div>
+        {scrub
+          ? <div className="text-text-soft-400">{formatChartTime(period)(scrub.t)}</div>
+          : <div><span className={cn('text-label-sm', tone(v.performance))}>{formatSigned(v.performance)} CHF</span> absolute performance</div>}
+      </div>
+
+      <AreaChart data={series} height={190} fill onScrub={setScrub} formatTime={formatChartTime(period)} className="mt-4 flex-1" />
+      <PeriodControl value={period} onChange={setPeriod} periods={PORTFOLIO_PERIODS} className="mt-4" />
+
+      <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+        {tiles.map((c) => (
+          <Link key={c.label} href={c.href} className="rounded-2xl p-3.5 ring-1 ring-inset ring-stroke-soft-200 transition-colors hover:bg-bg-weak-50">
+            <div className="flex items-center justify-between text-paragraph-sm text-text-strong-950">
+              <span className="flex items-center gap-1.5"><c.icon className="size-4 text-primary-base" />{c.label}</span>
+              <RiArrowRightSLine className="size-4 text-text-soft-400" />
+            </div>
+            <div className="mt-1.5 text-label-lg tabular-nums text-text-strong-950">{formatNumber(c.v)}</div>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function Watchlist({ s, limit = 5, className }: { s: MarketState; limit?: number; className?: string }) {
+  const items = s.portfolio.watchlist.map(instrument).filter((i): i is Instrument => !!i).slice(0, limit);
+  return (
+    <section className={cn('rounded-3xl bg-bg-white-0 p-5 ring-1 ring-inset ring-stroke-soft-200', className)}>
+      <div className="mb-1 flex items-center justify-between">
+        <h2 className="text-label-md text-text-strong-950">Watchlist</h2>
+        <Link href="/trade?tab=watchlist" className="flex items-center text-label-sm text-primary-base hover:underline">See all<RiArrowRightSLine className="size-4" /></Link>
+      </div>
+      {items.length
+        ? items.map((i) => <InstrumentRow key={i.symbol} i={i} s={s} compact />)
+        : <p className="py-4 text-paragraph-sm text-text-soft-400">Star an instrument to follow it here.</p>}
+    </section>
+  );
+}
+
+function CryptoStrip({ s }: { s: MarketState }) {
+  const [sel, setSel] = useState<Instrument | null>(null);
+  const [open, setOpen] = useState(false);
+  const coins = INSTRUMENTS.filter((i) => i.kind === 'crypto');
+  return (
+    <section>
+      <div className="mb-3 flex items-end justify-between">
+        <div>
+          <h2 className="text-label-md text-text-strong-950">Crypto on SQX</h2>
+          <p className="text-paragraph-xs text-text-sub-600">Swissquote&apos;s exchange, aggregating liquidity for competitive prices</p>
+        </div>
+        <Link href="/trade?tab=markets&cat=crypto" className="flex shrink-0 items-center text-label-sm text-primary-base hover:underline">Discover<RiArrowRightSLine className="size-4" /></Link>
+      </div>
+      <FadeScroller className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:mx-0 sm:px-0">
+        {coins.map((i) => {
+          const price = s.prices[i.symbol];
+          return (
+            <div key={i.symbol} className="relative flex w-[264px] shrink-0 snap-start flex-col overflow-hidden rounded-2xl bg-bg-white-0 ring-1 ring-inset ring-stroke-soft-200">
+              <Link href={`/trade/${i.symbol}`} className="flex items-center gap-3 p-4 pb-0">
+                <InstrumentLogo i={i} className="size-11 text-label-md" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-paragraph-sm text-text-sub-600"><b className="font-medium text-text-strong-950">{i.symbol}</b> {i.name}</span>
+                    <ChangePill pct={price / prevClose(i) - 1} className="shrink-0" />
+                  </div>
+                  <div className="text-label-lg tabular-nums text-text-strong-950">{formatPrice(price, i)} <span className="text-paragraph-xs text-text-soft-400">USD</span></div>
+                </div>
+              </Link>
+              <Link href={`/trade/${i.symbol}`} tabIndex={-1} aria-hidden><Sparkline data={priceSeries(i, '1W', price, s.updatedAt)} className="mt-3 h-24 w-full" /></Link>
+              <div className="absolute bottom-3 right-3">
+                <Button.Root size="xsmall" onClick={() => { setSel(i); setOpen(true); }}>Trade now</Button.Root>
+              </div>
+            </div>
+          );
+        })}
+      </FadeScroller>
+      {sel && <TradeSheet i={sel} side="buy" open={open} onOpenChange={setOpen} />}
+    </section>
+  );
+}
+
+/** Horizontal scroller whose edges fade out, only on the sides that have more content to scroll to. */
+function FadeScroller({ className, children, fade = 64 }: { className?: string; children: React.ReactNode; fade?: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [edges, setEdges] = useState({ start: false, end: false });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const update = () => {
+      const start = el.scrollLeft > 1;
+      const end = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
+      setEdges((e) => (e.start === start && e.end === end ? e : { start, end }));
+    };
+    update();
+    el.addEventListener('scroll', update, { passive: true });
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => { el.removeEventListener('scroll', update); ro.disconnect(); };
+  }, []);
+  const mask = `linear-gradient(to right, ${edges.start ? 'transparent' : '#000'}, #000 ${fade}px, #000 calc(100% - ${fade}px), ${edges.end ? 'transparent' : '#000'})`;
+  return <div ref={ref} className={className} style={{ maskImage: mask, WebkitMaskImage: mask }}>{children}</div>;
 }

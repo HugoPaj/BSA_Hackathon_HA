@@ -9,7 +9,6 @@ import * as Badge from '@/components/ui/badge';
 import * as Button from '@/components/ui/button';
 import * as FancyButton from '@/components/ui/fancy-button';
 import * as Alert from '@/components/ui/alert';
-import * as Switch from '@/components/ui/switch';
 import { RequireLogin } from '@/components/require-login';
 import { PageTitle } from '@/components/page-title';
 import { RecoveryBanner } from '@/components/recovery-banner';
@@ -93,7 +92,7 @@ function SecurityInner({ data, refresh }: { data: WalletData; refresh: () => voi
           </div>
           <div className="mt-4 flex items-start justify-between gap-4 rounded-xl p-3 ring-1 ring-inset ring-stroke-soft-200">
             <div><div className="text-label-sm text-text-strong-950">Bank-assisted recovery</div><div className="text-paragraph-xs text-text-sub-600">{wallet.bankAssisted ? 'Swissquote is Guardian A. To opt out, your passkey swaps it for a trusted contact (guardian rotation, production feature).' : 'Off: a trusted contact is Guardian A.'}</div></div>
-            <Switch.Root checked={wallet.bankAssisted} disabled />
+            <Badge.Root color={wallet.bankAssisted ? 'green' : 'gray'} variant="lighter" className="shrink-0">{wallet.bankAssisted ? 'On' : 'Off'}</Badge.Root>
           </div>
         </Section>
       </div>
@@ -160,7 +159,7 @@ function DemoTools({ data, refresh }: { data: WalletData; refresh: () => void })
         </div>
       </div>
       {old && <TxSheet open={open} onOpenChange={setOpen} flow={flow} title="Sign with the revoked passkey" txs={txs} guardianType={wallet.guardianB.type} confirmLabel="Sign with old passkey" onDone={refresh}
-        headline={<Alert.Root status="information" variant="lighter" size="small"><Alert.Icon />Swissquote sponsors this harmless settings call. Your browser will ask for the <b>&nbsp;old&nbsp;</b> passkey ({shortAddress(old.signer)}). Expect the network to reject it.</Alert.Root>} />}
+        headline={<Alert.Root status="information" variant="lighter" size="small"><Alert.Icon /><span>Swissquote sponsors this harmless settings call. Your browser will ask for the <b>old</b> passkey ({shortAddress(old.signer)}). Expect the network to reject it.</span></Alert.Root>} />}
     </Section>
   );
 }

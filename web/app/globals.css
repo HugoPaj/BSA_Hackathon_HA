@@ -845,6 +845,15 @@
   transform-origin: center;
 }
 
+/* Always reserve the scrollbar's space, so the centred header doesn't shift between short and long pages. */
+html {
+  scrollbar-gutter: stable;
+}
+/* Radix's scroll lock adds the scrollbar width as a margin when a modal opens; the gutter already reserves it. */
+html body[data-scroll-locked] {
+  margin-right: 0 !important;
+}
+
 /* AlignUI Body Styles */
 body {
   background: var(--color-bg-weak-50);

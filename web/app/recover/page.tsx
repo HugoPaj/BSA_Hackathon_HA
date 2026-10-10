@@ -171,7 +171,7 @@ function GuardianB({ info, session, onDone }: { info: Info; session: PublicRecov
         <div className="text-subheading-2xs uppercase tracking-wider text-text-soft-400">Guardian B · something only you have</div>
         <h2 className="mt-1 text-title-h5 text-text-strong-950">Approve with your {gB.type === 'passkey' ? 'recovery device' : 'recovery card'}</h2>
         <p className="mt-1 text-paragraph-sm text-text-sub-600">
-          {gB.type === 'passkey' ? 'Your browser will ask for the recovery passkey. Choose “Use another device” and scan the QR code with the phone or laptop that holds it, or use your security key.' : 'Enter the code from your recovery card and its PIN. The card key signs the request in this browser and is never sent anywhere.'}
+          {gB.type === 'passkey' ? 'Your browser will ask for the recovery passkey. Choose “Use another device” and scan the QR code with the phone or laptop that holds it, or use your security key.' : 'Use the recovery card you printed or copied when you created your wallet, plus the PIN you chose for it. The card key signs the request in this browser and is never sent anywhere.'}
         </p>
       </div>
       <div className="rounded-xl bg-bg-weak-50 p-3 font-mono text-[11px] leading-relaxed text-text-sub-600">ExecuteRecovery(wallet {shortAddress(session.wallet)}, newOwners [{shortAddress(session.newOwner.signer)}], newThreshold 1, nonce {session.nonce})</div>
@@ -190,7 +190,7 @@ function GuardianB({ info, session, onDone }: { info: Info; session: PublicRecov
       {!missing ? (
         <button className="w-full text-center text-label-xs text-text-soft-400 hover:text-text-sub-600" onClick={() => setMissing(true)}>I don&apos;t have it</button>
       ) : (
-        <Alert.Root status="information" variant="lighter" size="small"><Alert.Icon /><div><b>Then recovery is not possible, by design.</b> This is exactly what stops a thief who has your phone and your e-mail: they can pass a login, but they don&apos;t hold Guardian B. If you truly lost both, a trusted contact can stand in for Swissquote, but your own factor is always required.</div></Alert.Root>
+        <Alert.Root status="information" variant="lighter" size="small"><Alert.Icon /><div><b>Then recovery is not possible, by design.</b> This is exactly what stops a thief who has your phone and your e-mail: they can pass a login, but they don&apos;t hold Guardian B. If you lost both your passkey and your recovery factor, the wallet cannot be recovered: that is the price of nobody else being able to take it over.</div></Alert.Root>
       )}
     </Panel>
   );

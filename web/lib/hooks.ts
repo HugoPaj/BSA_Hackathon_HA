@@ -41,8 +41,8 @@ export function useActivity(intervalMs = 8000) {
   return usePoll(() => api<{ activity: Activity[] }>('/api/activity').then((r) => r.activity), intervalMs);
 }
 
-export function useAlerts(intervalMs = 5000) {
-  return usePoll(() => api<{ alerts: Alert[] }>('/api/alerts').then((r) => r.alerts).catch(() => [] as Alert[]), intervalMs);
+export function useAlerts(intervalMs = 5000, enabled = true) {
+  return usePoll(() => (enabled ? api<{ alerts: Alert[] }>('/api/alerts').then((r) => r.alerts).catch(() => [] as Alert[]) : Promise.resolve(undefined)), enabled ? intervalMs : 0, [enabled]);
 }
 
 export function useNow(intervalMs = 1000) {
