@@ -59,7 +59,7 @@ export function TxSheet({ open, onOpenChange, flow, title, headline, txs, guardi
       ) : (
         <div className="space-y-4">
           {headline}
-          {(evaluation || phase !== 'error') && <ChecksList evaluation={evaluation} plan={flow.plan} checks={flow.checks} />}
+          {(evaluation || phase !== 'error') && <ChecksList evaluation={evaluation} plan={flow.plan} checks={flow.checks} checking={flow.checking} />}
 
           {evaluation && (
             <div className="divide-y divide-stroke-soft-200 rounded-xl ring-1 ring-inset ring-stroke-soft-200">

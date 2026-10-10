@@ -22,6 +22,7 @@ export function useTxFlow(opts: { wallet: Pick<WalletRecord, 'address' | 'owner'
   // Live policy progress while Swissquote decides: which checks run, and those already decided.
   const [plan, setPlan] = useState<PlannedCheck[] | null>(null);
   const [checks, setChecks] = useState<Check[]>([]);
+  const [checking, setChecking] = useState(false); // the sponsorship request is with Swissquote
   const [error, setError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
   const [op, setOp] = useState<UserOperationV7 | null>(null);
@@ -29,10 +30,17 @@ export function useTxFlow(opts: { wallet: Pick<WalletRecord, 'address' | 'owner'
   const [meta, setMeta] = useState<Meta | null>(null);
   const signer = opts.signer ?? opts.wallet.owner;
 
-  const reset = useCallback(() => { setPhase('idle'); setEvaluation(null); setPlan(null); setChecks([]); setError(null); setTxHash(null); setOp(null); setSponsored(null); }, []);
+  const reset = useCallback(() => { setPhase('idle'); setEvaluation(null); setPlan(null); setChecks([]); setChecking(false); setError(null); setTxHash(null); setOp(null); setSponsored(null); }, []);
 
-  const onProgress = useCallback((p: Progress) => {
-    if ('plan' in p) { setPlan(p.plan); setChecks([]); } else setChecks((cs) => [...cs, p.check]);
+  const sponsorLive = useCallback(async (userOp: UserOperationV7, stepUpId?: string) => {
+    setChecking(true);
+    try {
+      return await requestSponsorship(userOp, stepUpId, (p: Progress) => {
+        if ('plan' in p) { setPlan(p.plan); setChecks([]); } else setChecks((cs) => [...cs, p.check]);
+      });
+    } finally {
+      setChecking(false);
+    }
   }, []);
 
   const prepare = useCallback(async (txs: MetaTransaction[], m: Meta) => {
@@ -42,7 +50,7 @@ export function useTxFlow(opts: { wallet: Pick<WalletRecord, 'address' | 'owner'
     try {
       const built = await buildOp(opts.wallet.address, signer, opts.deployed, txs);
       setOp(built);
-      const r = await requestSponsorship(built, undefined, onProgress);
+      const r = await sponsorLive(built);
       setEvaluation(r.evaluation);
       if (r.userOp) { assertSameCalls(built, r.userOp); setSponsored(r.userOp); }
       setPhase(r.evaluation.decision === 'decline' ? 'declined' : 'review');
@@ -52,7 +60,7 @@ export function useTxFlow(opts: { wallet: Pick<WalletRecord, 'address' | 'owner'
       setPhase('error');
       return null;
     }
-  }, [opts.wallet.address, opts.deployed, signer, reset, onProgress]);
+  }, [opts.wallet.address, opts.deployed, signer, reset, sponsorLive]);
 
   const signAndSend = useCallback(async (userOp: UserOperationV7, isSponsored: boolean) => {
     setPhase('signing');
@@ -91,7 +99,7 @@ export function useTxFlow(opts: { wallet: Pick<WalletRecord, 'address' | 'owner'
           else throw new Error(gB.type === 'dnie' ? 'Confirm with your ID card first' : 'Unlock your recovery card first');
           await api('/api/stepup', { action: 'verify', id, signature });
         }
-        const r = await requestSponsorship(op!, id, onProgress);
+        const r = await sponsorLive(op!, id);
         setEvaluation(r.evaluation);
         if (!r.userOp) { setPhase('declined'); return; }
         assertSameCalls(op!, r.userOp);
@@ -104,7 +112,7 @@ export function useTxFlow(opts: { wallet: Pick<WalletRecord, 'address' | 'owner'
       setError(friendly(e));
       setPhase('error');
     }
-  }, [sponsored, evaluation, op, opts.wallet, signAndSend, onProgress]);
+  }, [sponsored, evaluation, op, opts.wallet, signAndSend, sponsorLive]);
 
   /** Self-paid fallback: same transaction without Swissquote's paymaster. Needs ETH in the wallet. */
   const payOwnGas = useCallback(async (txs: MetaTransaction[]) => {
@@ -120,7 +128,7 @@ export function useTxFlow(opts: { wallet: Pick<WalletRecord, 'address' | 'owner'
     }
   }, [opts.deployed, opts.wallet.address, signer, signAndSend]);
 
-  return { phase, evaluation, plan, checks, error, txHash, prepare, confirm, dnieStepUp, payOwnGas, reset };
+  return { phase, evaluation, plan, checks, checking, error, txHash, prepare, confirm, dnieStepUp, payOwnGas, reset };
 }
 
 export function friendly(e: unknown) {
