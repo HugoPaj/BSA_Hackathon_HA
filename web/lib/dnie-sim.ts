@@ -47,8 +47,8 @@ export function discardSimDnie() { localStorage.removeItem(KEY); }
 /** Sign a 32-byte hash, the way the real card does after PACE (CAN) and PIN verification. */
 export async function signWithSimDnie(can: string, pin: string, hash: Hex): Promise<{ signature: Hex; spki: string }> {
   const s = load();
-  if (!s) throw new Error('No simulated DNI in this browser');
-  if (s.triesLeft <= 0) throw new Error('This DNI\'s PIN is locked. A real DNI is unlocked at a police station; here, issue a new simulated card.');
+  if (!s) throw new Error('No simulated ID card in this browser');
+  if (s.triesLeft <= 0) throw new Error('This card\'s PIN is locked. A real ID card is unlocked by its issuing authority; here, issue a new simulated card.');
   if (can !== s.can) throw new Error('The CAN does not match this card. It is printed at the bottom right of the front.');
   let pkcs8: ArrayBuffer;
   try {

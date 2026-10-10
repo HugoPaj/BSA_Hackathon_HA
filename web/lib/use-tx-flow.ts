@@ -80,7 +80,7 @@ export function useTxFlow(opts: { wallet: Pick<WalletRecord, 'address' | 'owner'
           const gB = opts.wallet.guardianB;
           if (gB.type === 'passkey') signature = Safe.createWebAuthnSignature(await signWithPasskey([gB.credentialId], hexToBytes(s.challenge))) as Hex;
           else if (gB.type === 'card' && card) signature = await card.sign({ hash: s.challenge });
-          else throw new Error(gB.type === 'dnie' ? 'Confirm with your DNI first' : 'Unlock your recovery card first');
+          else throw new Error(gB.type === 'dnie' ? 'Confirm with your ID card first' : 'Unlock your recovery card first');
           await api('/api/stepup', { action: 'verify', id, signature });
         }
         const r = await requestSponsorship(op!, id);

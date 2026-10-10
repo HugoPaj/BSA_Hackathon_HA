@@ -114,7 +114,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
             origin.setText("");
             summaryCard.setVisibility(View.GONE);
             form.setVisibility(View.GONE);
-            status.setText("When the Swissquote wallet asks for your DNI, tap \"Open Swissquote ID\" there and this app takes over.");
+            status.setText("When the Swissquote wallet asks for your ID card, tap \"Open Swissquote ID\" there and this app takes over.");
             return;
         }
         reqId = data.getQueryParameter("id");
@@ -127,7 +127,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         form.setVisibility(View.GONE);
         status.setText("");
         if (nfc == null) {
-            status.setText("This phone has no NFC reader, so it cannot read a DNI.");
+            status.setText("This phone has no NFC reader, so it cannot read an ID card.");
             return;
         }
         io.execute(() -> {
@@ -141,7 +141,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
                 byte[] bytes = hex(h);
                 ui.post(() -> {
                     toSign = bytes;
-                    title.setText(r.optString("title", "Sign with your DNI"));
+                    title.setText(r.optString("title", "Sign with your ID card"));
                     summary.setText(lines.toString());
                     hash.setText(h);
                     summaryCard.setVisibility(View.VISIBLE);
@@ -161,14 +161,14 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
 
     private void startReading() {
         String c = can.getText().toString().trim();
-        if (c.length() != 6) { status.setText("Enter the 6-digit CAN printed on the front of your DNI."); return; }
-        if (pin.getText().length() < 8) { status.setText("Enter your DNI PIN (8 to 16 characters)."); return; }
+        if (c.length() != 6) { status.setText("Enter the 6-digit CAN printed on the front of your ID card."); return; }
+        if (pin.getText().length() < 8) { status.setText("Enter your ID card PIN (8 to 16 characters)."); return; }
         if (!nfc.isEnabled()) { status.setText("Turn on NFC in your phone settings, then try again."); return; }
         prefs.edit().putString("can", c).apply();
         ((InputMethodManager) getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(pin.getWindowToken(), 0);
         reading = true;
         go.setEnabled(false);
-        status.setText("Hold your DNI flat against the back of the phone and keep it still…");
+        status.setText("Hold your ID card flat against the back of the phone and keep it still…");
         Bundle opts = new Bundle();
         opts.putInt(NfcAdapter.EXTRA_READER_PRESENCE_CHECK_DELAY, 1000);
         nfc.enableReaderMode(this, this, NfcAdapter.FLAG_READER_NFC_A | NfcAdapter.FLAG_READER_NFC_B | NfcAdapter.FLAG_READER_SKIP_NDEF_CHECK | NfcAdapter.FLAG_READER_NO_PLATFORM_SOUNDS, opts);
@@ -192,7 +192,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
             PrivateKeyReference key = dnie.getPrivateKey(SIGN_ALIAS);
             X509Certificate cert = dnie.getCertificate(SIGN_ALIAS);
             X509Certificate intermediate = dnie.getCertificate(INTERMEDIATE_ALIAS);
-            if (key == null || cert == null) throw new Exception("This DNI has no signature certificate. Renew it at a police station update point.");
+            if (key == null || cert == null) throw new Exception("This ID card has no signature certificate. Renew it with the authority that issued the card.");
             byte[] sig = dnie.sign(toSign, "SHA256withRSA", key);
             ui.post(() -> { stopReading(); status.setText("Signed. Sending to your wallet…"); });
 
@@ -205,13 +205,13 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
             if (intermediate != null) body.put("intermediate", Base64.encodeToString(intermediate.getEncoded(), Base64.NO_WRAP));
             JSONObject r = new JSONObject(http("POST", server + "/api/dnie", body.toString()));
             if (!r.isNull("error")) throw new Exception(r.getString("error"));
-            ui.post(() -> done("Done. Go back to your browser: the wallet has your DNI signature."));
+            ui.post(() -> done("Done. Go back to your browser: the wallet has your ID card signature."));
         } catch (BadPinException e) {
             fail("Wrong PIN. " + e.getRemainingRetries() + " attempts left before the card locks.");
         } catch (AuthenticationModeLockedException e) {
-            fail("Your DNI PIN is locked. Unlock it at a police station update point (Punto de Actualización del DNIe).");
+            fail("Your ID card PIN is locked. The authority that issued the card can unlock it.");
         } catch (InvalidCanOrMrzException e) {
-            fail("The CAN does not match this card. Check the 6 digits on the front of your DNI.");
+            fail("The CAN does not match this card. Check the 6 digits on the front of your ID card.");
         } catch (Exception e) {
             fail(message(e));
         } finally {

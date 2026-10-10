@@ -106,7 +106,7 @@ export function TxSheet({ open, onOpenChange, flow, title, headline, txs, guardi
             ? <Alert.Root status="success" variant="lighter" size="small"><Alert.Icon />Recovery card unlocked. It co-signs when you confirm.</Alert.Root>
             : <CardUnlock onUnlocked={setCard} purpose="Confirm this high-value transfer" />)}
           {stepUp && phase === 'review' && guardianType === 'dnie' && (dnieStepUp
-            ? <Alert.Root status="success" variant="lighter" size="small"><Alert.Icon />Your DNI confirmed this transaction. Your passkey signs next.</Alert.Root>
+            ? <Alert.Root status="success" variant="lighter" size="small"><Alert.Icon />Your ID card confirmed this transaction. Your passkey signs next.</Alert.Root>
             : <DnieSign create={async () => { const r = await flow.dnieStepUp(); pendingStepUp.current = r.stepUpId; return r.request; }} onDone={() => setDnieStepUp(pendingStepUp.current)} />)}
 
           <StatusLine phase={phase} stepUp={stepUp} guardianType={guardianType} />
@@ -139,7 +139,7 @@ export function TxSheet({ open, onOpenChange, flow, title, headline, txs, guardi
 function StatusLine({ phase, stepUp, guardianType }: { phase: string; stepUp: boolean; guardianType: string }) {
   const text: Record<string, string> = {
     preparing: 'Swissquote is checking this transaction…',
-    stepup: guardianType === 'dnie' ? 'Checking your DNI confirmation…' : `Confirm on your ${guardianType === 'passkey' ? 'recovery device (choose “use another device” if asked)' : 'recovery card'}…`,
+    stepup: guardianType === 'dnie' ? 'Checking your ID card confirmation…' : `Confirm on your ${guardianType === 'passkey' ? 'recovery device (choose “use another device” if asked)' : 'recovery card'}…`,
     signing: 'Approve with your passkey…',
     submitting: 'Sending to the network…',
     confirming: `Waiting for ${CHAIN_NAME} to confirm…`,

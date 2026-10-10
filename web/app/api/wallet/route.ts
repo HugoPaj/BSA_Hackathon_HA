@@ -41,8 +41,8 @@ export async function POST(req: Request) {
     let card;
     try { card = await enrolledCard(client.clientId, r.guardianB.enrollId); } catch (e) { return fail((e as Error).message); }
     const guardian = rsaGuardianAddress(address, card);
-    if (!isAddressEqual(r.guardianB.address as Hex, guardian)) return fail('DNI guardian address mismatch');
-    r.guardianB = { type: 'dnie', enrollId: r.guardianB.enrollId, address: guardian, ...card, label: card.simulated ? `Simulated DNI (${card.holder})` : `DNI of ${card.holder}` };
+    if (!isAddressEqual(r.guardianB.address as Hex, guardian)) return fail('ID card guardian address mismatch');
+    r.guardianB = { type: 'dnie', enrollId: r.guardianB.enrollId, address: guardian, ...card, label: card.simulated ? `Simulated ID (${card.holder})` : `ID card of ${card.holder}` };
   }
   if (!r.bankAssisted && !/^0x[0-9a-fA-F]{40}$/.test(r.contact ?? '')) return fail('A trusted contact address is needed when bank-assisted recovery is off');
   const guardianA: WalletRecord['guardianA'] = r.bankAssisted

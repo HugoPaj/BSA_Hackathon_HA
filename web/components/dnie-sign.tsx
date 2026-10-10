@@ -90,28 +90,28 @@ export function DnieSign({ create, onDone, intro }: { create: () => Promise<Dnie
 
       {isAndroid() ? (
         <FancyButton.Root variant="primary" className="h-12 w-full" asChild>
-          <a href={links.intent}><FancyButton.Icon as={RiSmartphoneLine} />Open Swissquote ID and tap your DNI</a>
+          <a href={links.intent}><FancyButton.Icon as={RiSmartphoneLine} />Open Swissquote ID and tap your ID card</a>
         </FancyButton.Root>
       ) : (
         <div className="flex items-center gap-4 rounded-2xl p-4 ring-1 ring-inset ring-stroke-soft-200">
           <div className="shrink-0 rounded-xl bg-static-white p-2 ring-1 ring-inset ring-stroke-soft-200"><QRCodeSVG value={links.page} size={116} /></div>
           <div className="min-w-0 space-y-1.5 text-paragraph-xs text-text-sub-600">
             <div className="text-label-sm text-text-strong-950">Scan with your Android phone</div>
-            <p>The Swissquote ID app opens. Enter the CAN printed on your DNI and your PIN, then hold the card to the back of the phone.</p>
+            <p>The Swissquote ID app opens. Enter the CAN printed on your ID card and your PIN, then hold the card to the back of the phone.</p>
             {isLocal(origin) && <p className="text-warning-dark">This page runs on {origin.replace(/^https?:\/\//, '')}, which your phone cannot reach. Open the wallet through its network or Tailscale address.</p>}
           </div>
         </div>
       )}
 
       <div className="flex items-center justify-center gap-2 text-label-sm text-text-sub-600">
-        <RiLoader4Line className="size-4 animate-spin text-primary-base" />Waiting for your DNI…
+        <RiLoader4Line className="size-4 animate-spin text-primary-base" />Waiting for your ID card…
       </div>
       {req.lastError && <Alert.Root status="error" variant="lighter" size="small"><Alert.Icon />{req.lastError}</Alert.Root>}
 
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-stroke-soft-200 pt-3">
         <a href="/swissquote-id.apk" className="inline-flex items-center gap-1 text-label-xs text-text-soft-400 hover:text-text-sub-600"><RiAndroidLine className="size-4" />Get the Android app</a>
         <button onClick={() => setSim((s) => !s)} className="inline-flex items-center gap-1 text-label-xs text-text-soft-400 hover:text-text-sub-600">
-          No phone or DNI here? Use a simulated DNI<RiArrowDownSLine className={cn('size-4 transition-transform', sim && 'rotate-180')} />
+          No phone or ID card here? Use a simulated ID<RiArrowDownSLine className={cn('size-4 transition-transform', sim && 'rotate-180')} />
         </button>
       </div>
       {sim && <SimulatedDnie req={req} />}
@@ -133,7 +133,7 @@ function SimulatedDnie({ req }: { req: DnieRequest }) {
     return (
       <div className="space-y-3 rounded-2xl p-4 ring-1 ring-inset ring-stroke-soft-200">
         <div className="flex items-start justify-between gap-3">
-          <p className="text-paragraph-xs text-text-sub-600">Issue a simulated DNI in this browser. As at the police station, you choose its PIN (8 to 16 characters).</p>
+          <p className="text-paragraph-xs text-text-sub-600">Issue a simulated ID card in this browser. As at the issuing office, you choose its PIN (8 to 16 characters).</p>
           <MockTag>Simulated</MockTag>
         </div>
         <Input.Root><Input.Wrapper><Input.Input type="password" placeholder="Choose a PIN" value={pin} onChange={(e) => setPin(e.target.value)} /></Input.Wrapper></Input.Root>
@@ -141,7 +141,7 @@ function SimulatedDnie({ req }: { req: DnieRequest }) {
         <Button.Root variant="neutral" className="w-full" disabled={busy || pin.length < 8 || pin.length > 16 || pin !== pin2} onClick={async () => {
           setBusy(true);
           try { await issueSimDnie(pin); setCard(simDnie()); setPin(''); setPin2(''); } finally { setBusy(false); }
-        }}>{busy ? 'Generating the card key…' : 'Issue simulated DNI'}</Button.Root>
+        }}>{busy ? 'Generating the card key…' : 'Issue simulated ID card'}</Button.Root>
       </div>
     );
   }
@@ -149,7 +149,7 @@ function SimulatedDnie({ req }: { req: DnieRequest }) {
   return (
     <div className="space-y-3 rounded-2xl p-4 ring-1 ring-inset ring-stroke-soft-200">
       <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-[#e8eef6] to-[#c9d6e8] p-4 text-[#1d2b45]">
-        <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider"><span>España · Documento Nacional de Identidad</span><MockTag>Simulated</MockTag></div>
+        <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider"><span>National identity card</span><MockTag>Simulated</MockTag></div>
         <div className="mt-3 flex items-end justify-between">
           <div className="h-12 w-10 rounded-md bg-[#1d2b45]/15" />
           <div className="text-right"><div className="text-[9px] uppercase tracking-wider opacity-60">CAN</div><div className="font-mono text-label-md tracking-[0.2em]">{card.can}</div></div>
@@ -160,7 +160,7 @@ function SimulatedDnie({ req }: { req: DnieRequest }) {
       ) : (
         <>
           <div className="space-y-1.5"><div className="text-label-xs text-text-sub-600">CAN (6 digits on the card)</div><DigitInput.Root numInputs={6} value={can} onChange={setCan} /></div>
-          <Input.Root><Input.Wrapper><Input.Input type="password" placeholder="DNI PIN" value={pin} onChange={(e) => setPin(e.target.value)} /></Input.Wrapper></Input.Root>
+          <Input.Root><Input.Wrapper><Input.Input type="password" placeholder="ID card PIN" value={pin} onChange={(e) => setPin(e.target.value)} /></Input.Wrapper></Input.Root>
           <Button.Root variant="neutral" className="w-full" disabled={busy || can.length !== 6 || pin.length < 8} onClick={async () => {
             setBusy(true); setError(null);
             try {
@@ -168,11 +168,11 @@ function SimulatedDnie({ req }: { req: DnieRequest }) {
               await api('/api/dnie', { action: 'result', id: req.id, token: req.token, signature, spki, simulated: true });
               setSent(true);
             } catch (e) { setError((e as Error).message); setCard(simDnie()); } finally { setBusy(false); }
-          }}><Button.Icon as={RiIdCardLine} />{busy ? 'Card is signing…' : 'Tap simulated DNI'}</Button.Root>
+          }}><Button.Icon as={RiIdCardLine} />{busy ? 'Card is signing…' : 'Tap simulated ID card'}</Button.Root>
           {error && <Alert.Root status="error" variant="lighter" size="small"><Alert.Icon />{error}</Alert.Root>}
         </>
       )}
-      <p className="text-paragraph-xs text-text-soft-400">The key lives encrypted in this browser. It signs exactly like a DNIe (RSA-2048, SHA256withRSA), so the on-chain guardian checks it the same way.</p>
+      <p className="text-paragraph-xs text-text-soft-400">The key lives encrypted in this browser. It signs exactly like a real ID card (RSA-2048, SHA256withRSA), so the on-chain guardian checks it the same way.</p>
     </div>
   );
 }

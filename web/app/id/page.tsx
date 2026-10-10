@@ -27,13 +27,13 @@ export default function IdHandoff() {
     <div className="mx-auto max-w-[460px] space-y-5 rounded-3xl bg-bg-white-0 p-6 ring-1 ring-inset ring-stroke-soft-200 md:p-8">
       <span className="grid size-12 place-items-center rounded-2xl bg-primary-alpha-10 text-primary-base"><RiIdCardLine className="size-6" /></span>
       <div>
-        <h1 className="text-title-h5 text-text-strong-950">Sign with your DNI</h1>
-        <p className="mt-1 text-paragraph-sm text-text-sub-600">The Swissquote ID app reads your Spanish DNI over NFC. You enter the CAN printed on the card and your PIN; the card signs, and your wallet continues on the other screen.</p>
+        <h1 className="text-title-h5 text-text-strong-950">Sign with your ID card</h1>
+        <p className="mt-1 text-paragraph-sm text-text-sub-600">The Swissquote ID app reads your ID card over NFC. You enter the CAN printed on the card and your PIN; the card signs, and your wallet continues on the other screen.</p>
       </div>
       {!p ? (
         <Alert.Root status="warning" variant="lighter" size="small"><Alert.Icon />Open this page from the QR code in your wallet.</Alert.Root>
       ) : !android ? (
-        <Alert.Root status="information" variant="lighter" size="small"><Alert.Icon />Open this link on an Android phone with NFC. Reading a DNI needs the phone&apos;s NFC reader, which browsers cannot use directly.</Alert.Root>
+        <Alert.Root status="information" variant="lighter" size="small"><Alert.Icon />Open this link on an Android phone with NFC. Reading an ID card needs the phone&apos;s NFC reader, which browsers cannot use directly.</Alert.Root>
       ) : (
         <>
           {p.install && <Alert.Root status="information" variant="lighter" size="small"><Alert.Icon />Swissquote ID is not installed yet. Install it, then tap &quot;Open Swissquote ID&quot;.</Alert.Root>}

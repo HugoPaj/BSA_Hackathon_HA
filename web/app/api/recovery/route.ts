@@ -59,7 +59,7 @@ export async function POST(req: Request) {
     if (b.action === 'guardian') return json({ session: publicSession(await approveGuardianB(session, wallet, b.signature)) });
     if (b.action === 'dnie') {
       // The DNI approves on a phone, which has no recovery cookie: hand it a single-use request instead.
-      if (wallet.guardianB.type !== 'dnie') return fail('This wallet does not use a DNI as recovery factor');
+      if (wallet.guardianB.type !== 'dnie') return fail('This wallet does not use an ID card as recovery factor');
       const r = await createDnieRequest({
         clientId: client.clientId, purpose: 'recovery', ref: session.id, hash: session.hash, title: 'Approve wallet recovery',
         lines: [`Replace the owner of wallet ${shortAddress(session.wallet)}`, `with the new passkey ${shortAddress(session.newOwner.signer)}.`, 'Swissquote must also approve, then a safety delay runs that the current owner can cancel.'],

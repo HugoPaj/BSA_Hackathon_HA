@@ -144,7 +144,7 @@ function FactorStep({ wallet, factor, setFactor, onNext }: { wallet: string; fac
       {!factor && (
         <div className="grid gap-3 sm:grid-cols-3">
           {([
-            { id: 'dnie', icon: RiIdCardLine, t: 'Your Spanish DNI', d: 'Tap your ID card on an Android phone, PIN-protected', tag: 'No extra device' },
+            { id: 'dnie', icon: RiIdCardLine, t: 'Your ID card', d: 'Tap your ID card on an Android phone, PIN-protected', tag: 'No extra device' },
             { id: 'passkey', icon: RiMacbookLine, t: 'Passkey on another device', d: 'Your laptop, a second phone or a security key', tag: 'Recommended' },
             { id: 'card', icon: RiQrCodeLine, t: 'Recovery card', d: 'A printable code locked with a 6-digit PIN', tag: 'Offline' },
           ] as const).map((o) => (
@@ -162,9 +162,9 @@ function FactorStep({ wallet, factor, setFactor, onNext }: { wallet: string; fac
           create={() => api<DnieRequest>('/api/dnie', { action: 'create', purpose: 'enroll' })}
           onDone={(r) => {
             const card = r.card!;
-            setFactor({ type: 'dnie', enrollId: r.id, address: rsaGuardianAddress(wallet, card), ...card, label: card.simulated ? `Simulated DNI (${card.holder})` : `DNI of ${card.holder}` });
+            setFactor({ type: 'dnie', enrollId: r.id, address: rsaGuardianAddress(wallet, card), ...card, label: card.simulated ? `Simulated ID (${card.holder})` : `ID card of ${card.holder}` });
           }}
-          intro={<p className="text-paragraph-sm text-text-sub-600">Your DNI&apos;s signature key (the one you sign official documents with) becomes Guardian B. Its PIN protects it, the police reissue it if you lose it, and only its public key goes on-chain, in a small guardian contract.</p>}
+          intro={<p className="text-paragraph-sm text-text-sub-600">Your ID card&apos;s signature key (the one you sign official documents with) becomes Guardian B. Its PIN protects it, the issuing authority replaces it if you lose it, and only its public key goes on-chain, in a small guardian contract.</p>}
         />
       )}
 

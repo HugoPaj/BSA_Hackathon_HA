@@ -73,7 +73,7 @@ export type DnieCard = RsaPublicKey & {
 
 /** How the UI names each kind of Guardian B. */
 export function factorName(type: GuardianB['type']) {
-  return type === 'passkey' ? 'recovery device' : type === 'dnie' ? 'DNI' : 'recovery card';
+  return type === 'passkey' ? 'recovery device' : type === 'dnie' ? 'ID card' : 'recovery card';
 }
 
 /** Address of the per-key SafeWebAuthnSignerProxy for a passkey. This is what the Safe lists as owner. */
@@ -171,7 +171,7 @@ export function classifyCall(call: Call, wallet: string): DecodedCall {
       };
       if (names[d.functionName]) return { kind: 'security', action: names[d.functionName] };
     }
-    if (isRsaGuardianDeploy(call.to, call.data)) return { kind: 'security', action: 'Register your DNI as recovery guardian' };
+    if (isRsaGuardianDeploy(call.to, call.data)) return { kind: 'security', action: 'Register your ID card as recovery guardian' };
     if (isAddressEqual(call.to as Hex, SIGNER_FACTORY as Hex)) {
       decodeFunctionData({ abi: factoryAbi, data: call.data });
       return { kind: 'security', action: 'Register a passkey signer' };

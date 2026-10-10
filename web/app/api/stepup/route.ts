@@ -27,10 +27,10 @@ export async function POST(req: Request) {
   if (!wallet || wallet.clientId !== client.clientId) return fail('Unknown wallet', 404);
   if (b.action === 'dnie') {
     // The DNI signs on the phone; /api/dnie verifies it against the wallet's RsaGuardian and marks this step-up verified.
-    if (wallet.guardianB.type !== 'dnie') return fail('This wallet does not use a DNI as recovery factor');
+    if (wallet.guardianB.type !== 'dnie') return fail('This wallet does not use an ID card as recovery factor');
     const r = await createDnieRequest({
       clientId: client.clientId, purpose: 'stepup', ref: s.id, hash: s.challenge, title: 'Confirm a high-value transaction',
-      lines: [`Wallet ${shortAddress(wallet.address)} is sending a high-value transaction.`, `Transaction fingerprint ${s.callDataHash.slice(0, 10)}…${s.callDataHash.slice(-6)}`, 'Your passkey signs it after your DNI confirms.'],
+      lines: [`Wallet ${shortAddress(wallet.address)} is sending a high-value transaction.`, `Transaction fingerprint ${s.callDataHash.slice(0, 10)}…${s.callDataHash.slice(-6)}`, 'Your passkey signs it after your ID card confirms.'],
     });
     return json({ request: { ...publicDnieRequest(r), token: r.token } });
   }
