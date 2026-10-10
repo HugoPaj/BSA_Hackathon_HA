@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import type { MetaTransaction } from 'abstractionkit';
-import { RiExchangeLine, RiGiftLine, RiShieldCheckLine, RiArrowRightLine, RiFlaskLine, RiForbidLine, RiSearchEyeLine, RiShieldKeyholeLine } from '@remixicon/react';
+import { RiExchangeLine, RiGiftLine, RiShieldCheckLine, RiArrowRightLine, RiForbidLine } from '@remixicon/react';
 import * as StatusBadge from '@/components/ui/status-badge';
 import * as Button from '@/components/ui/button';
 import { RequireLogin } from '@/components/require-login';
@@ -13,8 +13,8 @@ import { useWallet } from '@/lib/hooks';
 import { useConfig } from '@/lib/use-config';
 import { useTxFlow } from '@/lib/use-tx-flow';
 import { approveTx, transferTx } from '@/lib/chain';
-import { PERMIT2, SERVICE_FEE, STEP_UP_THRESHOLD } from '@/lib/config';
-import { formatUsdc, shortAddress } from '@/lib/format';
+import { PERMIT2, SERVICE_FEE } from '@/lib/config';
+import { shortAddress } from '@/lib/format';
 
 const UNKNOWN_SPENDER = '0x1111111111111111111111111111111111111111';
 const MAX = 2n ** 256n - 1n;
@@ -63,7 +63,6 @@ function DappsInner({ data, treasury, refresh }: { data: Required<NonNullable<Re
   return (
     <div className="mx-auto max-w-[860px]">
       {title}
-      <ProtectionTiles />
       <div className="grid gap-4 md:grid-cols-2">
         {dapps.map((d) => (
           <div key={d.name} className="flex flex-col rounded-3xl bg-bg-white-0 p-5 ring-1 ring-inset ring-stroke-soft-200">
@@ -99,30 +98,10 @@ function DappsInner({ data, treasury, refresh }: { data: Required<NonNullable<Re
   );
 }
 
-/** The four checks Swissquote runs. Static, so the skeleton shows them too. */
-function ProtectionTiles() {
-  return (
-    <div className="mb-6 grid gap-3 sm:grid-cols-4">
-      {[
-        { icon: RiShieldCheckLine, t: 'Allowlist', d: 'Known contracts only' },
-        { icon: RiFlaskLine, t: 'Simulation', d: 'Exact balance changes' },
-        { icon: RiSearchEyeLine, t: 'Sanctions screen', d: 'Every counterparty' },
-        { icon: RiShieldKeyholeLine, t: 'High-value step-up', d: `Above ${formatUsdc(STEP_UP_THRESHOLD)} USDC or unlimited` },
-      ].map((s) => (
-        <div key={s.t} className="flex items-center gap-3 rounded-2xl bg-bg-white-0 p-3 ring-1 ring-inset ring-stroke-soft-200">
-          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary-alpha-10 text-primary-base"><s.icon className="size-5" /></span>
-          <div><div className="text-label-sm text-text-strong-950">{s.t}</div><div className="text-paragraph-xs text-text-sub-600">{s.d}</div></div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function DappsSkeleton() {
   return (
     <div className="mx-auto max-w-[860px]">
       {title}
-      <ProtectionTiles />
       <Skeleton className="grid gap-4 md:grid-cols-2">
         {[0, 1].map((i) => (
           <BoneCard key={i} className="md:p-5">
