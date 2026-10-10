@@ -13,7 +13,7 @@ type BO = {
   wallets: { clientId: string; address: string; deployed: boolean; owner: string; guardianA: { label: string; address: string }; guardianB: { type: string; address: string; label: string }; proof: { verifiedAt: number } | null; previousOwners: number }[];
   recoveries: PublicRecoverySession[];
   treasury: { address: string; usdc: bigint; eth: bigint };
-  guardian: string;
+  guardian: { safe: string | null; swissquote: { address?: string; online: boolean }; partner: { address?: string; online: boolean } };
 };
 
 const A = ({ a }: { a: string }) => <a className="inline-flex items-center gap-0.5 font-mono text-paragraph-xs text-primary-base hover:underline" target="_blank" href={`${EXPLORER}/address/${a}`}>{shortAddress(a)}<RiExternalLinkLine className="size-3" /></a>;
@@ -31,10 +31,14 @@ export default function Backoffice() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <Card icon={RiKey2Line} title="Guardian key (Guardian A)" sub="HSM in production · software key in the demo">
-          {data && <A a={data.guardian} />}
-          <Rule ok text="Signs EIP-712 recovery approvals" />
-          <Rule ok text="Only after login + liveness match, four-eyes" />
+        <Card icon={RiKey2Line} title="Guardian A (1-of-2 Safe)" sub="Separate guardian processes · HSMs in production">
+          {data && <>
+            {data.guardian.safe ? <A a={data.guardian.safe} /> : <span className="text-paragraph-xs text-text-soft-400">Not deployed yet</span>}
+            <Signer label="Swissquote HSM" s={data.guardian.swissquote} />
+            <Signer label="Independent partner" s={data.guardian.partner} />
+          </>}
+          <Rule ok text="Signs EIP-712 recovery approvals, nothing else" />
+          <Rule ok text="Re-checks Guardian B on-chain, then liveness" />
           <Rule text="Cannot sign transactions or spend" />
           <Rule text="Cannot recover without the client's Guardian B" />
         </Card>
@@ -104,6 +108,15 @@ function Card({ icon: Icon, title, sub, children }: { icon: typeof RiBankLine; t
         <div><div className="text-label-md text-text-strong-950">{title}</div><div className="text-paragraph-xs text-text-soft-400">{sub}</div></div>
       </div>
       <div className="space-y-1.5">{children}</div>
+    </div>
+  );
+}
+
+function Signer({ label, s }: { label: string; s: { address?: string; online: boolean } }) {
+  return (
+    <div className="flex items-center justify-between gap-2 text-paragraph-xs text-text-sub-600">
+      <span>{label}</span>
+      {s.online && s.address ? <A a={s.address} /> : <Badge.Root color="red" variant="lighter">Offline</Badge.Root>}
     </div>
   );
 }

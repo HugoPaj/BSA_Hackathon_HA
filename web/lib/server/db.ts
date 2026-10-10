@@ -3,7 +3,8 @@ import 'server-only';
 import fs from 'node:fs';
 import path from 'node:path';
 import { parse, stringify } from '../json';
-import type { GuardianB } from '../chain';
+import type { DnieCard, GuardianB } from '../chain';
+import type { LivenessAttestation } from '../liveness';
 
 export const DATA_DIR = process.env.DATA_DIR ?? path.join(process.cwd(), '.data');
 const FILE = path.join(DATA_DIR, 'db.json');
@@ -19,7 +20,7 @@ export type WalletRecord = {
   guardianA: { type: 'swissquote' | 'contact'; address: string; label: string };
   guardianB: GuardianB & { label: string };
   bankAssisted: boolean;
-  proof?: { verifiedAt: number; signer: string; message: string; method: string };
+  proof?: { verifiedAt: number; signer: string; message: string; method: string; signature?: string };
 };
 export type RecoverySession = {
   id: string;
@@ -30,7 +31,7 @@ export type RecoverySession = {
   nonce: string;
   createdAt: number;
   guardianB?: { signature: string; verifiedAt: number };
-  liveness?: { result: 'match' | 'mismatch'; at: number };
+  liveness?: { result: 'match' | 'mismatch'; at: number; attestation?: LivenessAttestation };
   swissquote?: { signature: string; signedAt: number };
   submittedTx?: string;
   executeAfter?: number;
@@ -63,6 +64,22 @@ export type Activity = {
   fee?: bigint;
 };
 export type AuditEntry = { id: string; ts: number; actor: string; action: string; wallet?: string; detail: string; outcome: 'approved' | 'declined' | 'info' };
+/** A pending DNIe signature: created by the wallet, fulfilled by the Swissquote ID app (or the demo simulator). */
+export type DnieRequest = {
+  id: string;
+  token: string; // unguessable; the phone app holds it instead of a session cookie
+  clientId: string;
+  purpose: 'enroll' | 'recovery' | 'stepup';
+  ref?: string; // recovery session id or step-up id
+  hash: string; // the 32 bytes the card signs
+  title: string;
+  lines: string[];
+  createdAt: number;
+  expires: number;
+  status: 'open' | 'done';
+  error?: string; // last failed attempt, the request stays open for a retry
+  card?: DnieCard; // set once a valid signature arrived
+};
 export type StepUp = { id: string; wallet: string; challenge: string; callDataHash: string; expires: number; verified?: boolean };
 
 type DB = {
@@ -73,9 +90,10 @@ type DB = {
   activity: Activity[];
   audit: AuditEntry[];
   stepUps: Record<string, StepUp>;
+  dnieRequests: Record<string, DnieRequest>;
 };
 
-const empty = (): DB => ({ sessions: {}, wallets: {}, recoveries: {}, alerts: [], activity: [], audit: [], stepUps: {} });
+const empty = (): DB => ({ sessions: {}, wallets: {}, recoveries: {}, alerts: [], activity: [], audit: [], stepUps: {}, dnieRequests: {} });
 
 function load(): DB {
   try {

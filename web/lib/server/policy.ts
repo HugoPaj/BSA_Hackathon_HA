@@ -4,7 +4,7 @@ import 'server-only';
 import type { UserOperationV7 } from 'abstractionkit';
 import { isAddressEqual, keccak256, type Hex } from 'viem';
 import { NODE_RPC, PERMIT2, SERVICE_FEE, STEP_UP_THRESHOLD, UNIVERSAL_ROUTER, USDC } from '../config';
-import { classifyCall, client, decodeCalls, erc20Abi, type DecodedCall } from '../chain';
+import { classifyCall, client, decodeCalls, erc20Abi, factorName, type DecodedCall } from '../chain';
 import { formatUsdc, shortAddress } from '../format';
 import { read, type WalletRecord } from './db';
 import { opsAddress } from './aa';
@@ -112,8 +112,8 @@ export async function evaluate(op: UserOperationV7, wallet: WalletRecord, stepUp
       return s && s.verified && s.wallet.toLowerCase() === wallet.address.toLowerCase() && s.callDataHash === keccak256(op.callData as Hex) && s.expires > Date.now();
     });
     checks.push(verified
-      ? { id: 'stepup', label: 'High-value check', status: 'pass', detail: `Confirmed with your ${wallet.guardianB.type === 'passkey' ? 'recovery device' : 'recovery card'}` }
-      : { id: 'stepup', label: 'High-value check', status: 'required', detail: `${unlimited.length ? 'Unlimited approvals need' : largeApproval && outgoing < STEP_UP_THRESHOLD ? `Approvals above ${formatUsdc(STEP_UP_THRESHOLD)} USDC need` : `Above ${formatUsdc(STEP_UP_THRESHOLD)} USDC,`} your ${wallet.guardianB.type === 'passkey' ? 'recovery device' : 'recovery card'} ${largeApproval && outgoing < STEP_UP_THRESHOLD ? 'too' : 'confirms too'}` });
+      ? { id: 'stepup', label: 'High-value check', status: 'pass', detail: `Confirmed with your ${factorName(wallet.guardianB.type)}` }
+      : { id: 'stepup', label: 'High-value check', status: 'required', detail: `${unlimited.length ? 'Unlimited approvals need' : largeApproval && outgoing < STEP_UP_THRESHOLD ? `Approvals above ${formatUsdc(STEP_UP_THRESHOLD)} USDC need` : `Above ${formatUsdc(STEP_UP_THRESHOLD)} USDC,`} your ${factorName(wallet.guardianB.type)} ${largeApproval && outgoing < STEP_UP_THRESHOLD ? 'too' : 'confirms too'}` });
   }
 
   const failed = checks.find((c) => c.status === 'fail');

@@ -30,8 +30,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const nav = signedIn && !bare && !recovering;
 
   return (
-    <div className="flex min-h-dvh flex-col">
-      <header className="sticky top-0 z-40 border-b border-stroke-soft-200 bg-bg-white-0/90 backdrop-blur-md">
+    // The page scrolls inside its own container under the header, so the scrollbar starts below the navbar, not over it.
+    <div className="flex h-dvh flex-col">
+      {/* The header reserves the same gutter as the scroller, so its centred row lines up with the content below. */}
+      <header className="z-40 shrink-0 overflow-hidden border-b border-stroke-soft-200 bg-bg-white-0 [scrollbar-gutter:stable]">
         <div className={cn('mx-auto flex h-16 items-center gap-6 px-4 lg:px-8', !landing && 'max-w-[1220px]')}>
           <Link href="/" className="flex shrink-0 items-center"><SqLogo product={bare ? 'Operations' : undefined} /></Link>
           {nav && (
@@ -53,7 +55,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <main className={cn(landing ? 'flex flex-1 flex-col bg-bg-white-0' : 'mx-auto w-full max-w-[1220px] flex-1 px-4 pt-6 lg:px-8 lg:pt-10', !landing && (nav ? 'pb-28 md:pb-16' : 'pb-16'))}>{children}</main>
+      <div className="flex flex-1 flex-col overflow-y-auto [scrollbar-gutter:stable]">
+        <main className={cn(landing ? 'flex flex-1 flex-col bg-bg-white-0' : 'mx-auto w-full max-w-[1220px] flex-1 px-4 pt-6 lg:px-8 lg:pt-10', !landing && (nav ? 'pb-28 md:pb-16' : 'pb-16'))}>{children}</main>
+      </div>
 
       {nav && (
         <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-stroke-soft-200 bg-bg-white-0/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden">

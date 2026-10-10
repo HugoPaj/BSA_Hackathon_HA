@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Wallet Rescue · independent recovery</title>
+  <link rel="icon" href="data:," />
+  <style>
+    :root { --bg: #f4f5f7; --card: #fff; --text: #14161a; --sub: #5c6370; --soft: #9aa1ad; --line: #e3e6eb; --accent: #1f6f4a; --accent-weak: #e6f2ec; --warn: #9a5b00; --warn-weak: #fdf3e1; --err: #b42318; --err-weak: #fdecea; --mono: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    main { max-width: 760px; margin: 0 auto; padding: 32px 20px 64px; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    h1 { font-size: 26px; margin: 0; letter-spacing: -0.01em; }
+    h2 { font-size: 17px; margin: 0 0 4px; }
+    h3 { font-size: 14px; margin: 18px 0 6px; }
+    p { margin: 6px 0; color: var(--sub); }
+    .badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: var(--accent-weak); color: var(--accent); font-size: 12px; font-weight: 600; }
+    .badge.mock { background: var(--warn-weak); color: var(--warn); }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 20px; margin-top: 16px; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    input, textarea { font: inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; width: 100%; background: #fff; }
+    textarea { font-family: var(--mono); font-size: 12px; min-height: 70px; }
+    input.mono { font-family: var(--mono); font-size: 13px; }
+    button { font: inherit; font-weight: 600; padding: 10px 16px; border-radius: 10px; border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer; }
+    button.secondary { background: #fff; color: var(--text); border-color: var(--line); }
+    button.danger { background: #fff; color: var(--err); border-color: #f1c4bf; }
+    button:disabled { opacity: .5; cursor: default; }
+    .tabs { display: flex; gap: 6px; background: var(--bg); padding: 4px; border-radius: 12px; margin-bottom: 14px; }
+    .tabs button { flex: 1; background: transparent; color: var(--sub); border: 0; }
+    .tabs button.on { background: #fff; color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+    dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 12px 0 0; font-size: 14px; }
+    dt { color: var(--soft); }
+    dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+    .mono { font-family: var(--mono); font-size: 12.5px; }
+    .step { border-top: 1px solid var(--line); padding-top: 14px; margin-top: 14px; }
+    .step.done h3::after { content: " ✓"; color: var(--accent); }
+    .step.locked { opacity: .45; pointer-events: none; }
+    .log { margin-top: 12px; font-size: 13px; display: grid; gap: 4px; }
+    .log div { padding: 8px 10px; border-radius: 8px; background: var(--bg); }
+    .log .ok { background: var(--accent-weak); color: var(--accent); }
+    .log .err { background: var(--err-weak); color: var(--err); }
+    .log .warn { background: var(--warn-weak); color: var(--warn); }
+    a { color: var(--accent); }
+    .hidden { display: none !important; }
+    footer { margin-top: 24px; font-size: 12.5px; color: var(--soft); }
+    footer code { font-family: var(--mono); }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Wallet Rescue</h1>
+    <span class="badge">Independent · works without Swissquote</span>
+  </header>
+  <p>An open-source page run by the independent recovery partner. Use it if Swissquote's app or services are unavailable, temporarily or for good. Your wallet is a Safe smart account on-chain, so nobody's servers are needed to reach your funds.</p>
+
+  <section class="card">
+    <h2>1 · Your wallet</h2>
+    <p>The address is on your recovery card, your statements, and the wallet's Security page.</p>
+    <div class="row" style="margin-top:10px">
+      <input id="address" class="mono" placeholder="0x… wallet address" style="flex:1;min-width:260px" />
+      <button id="lookup">Look up</button>
+    </div>
+    <div id="walletInfo" class="hidden"></div>
+  </section>
+
+  <section class="card hidden" id="actions">
+    <div class="tabs">
+      <button data-tab="send" class="on">I still have my passkey</button>
+      <button data-tab="recover">I lost my passkey</button>
+    </div>
+
+    <div id="tab-send">
+      <h2>Move your funds out</h2>
+      <p>Your passkey signs, and a public ERC-4337 bundler sends the transaction. No Swissquote approval, fee or sponsorship.</p>
+      <dl id="signerInfo" class="hidden"></dl>
+      <h3>Send USDC to</h3>
+      <input id="dest" class="mono" placeholder="0x… destination address" />
+      <h3>Amount (USDC)</h3>
+      <div class="row"><input id="amount" type="number" min="0" step="0.01" style="flex:1" /><button class="secondary" id="max">Max</button></div>
+      <div class="row" style="margin-top:14px"><button id="send">Sign with passkey and send</button></div>
+      <div class="log" id="sendLog"></div>
+    </div>
+
+    <div id="tab-recover" class="hidden">
+      <h2>Recover with your recovery factor and the partner</h2>
+      <p>Guardian A of your wallet is a 1-of-2 Safe: Swissquote <i>or</i> the independent partner can approve. Guardian B is your own recovery factor. Both must approve, then a delay runs during which your old passkey can still cancel.</p>
+
+      <div class="step" id="s-new">
+        <h3>a · Create a new passkey on this device</h3>
+        <button id="newKey">Create new passkey</button>
+        <div class="log" id="newLog"></div>
+      </div>
+
+      <div class="step locked" id="s-factor">
+        <h3>b · Your recovery factor approves (Guardian B)</h3>
+        <p>It signs exactly this request: <span class="mono" id="request"></span></p>
+        <div class="row"><button class="secondary" id="factorPasskey">Use my recovery passkey</button></div>
+        <p style="margin-top:14px">…or your recovery card</p>
+        <textarea id="cardCode" placeholder="SQRC1.…"></textarea>
+        <div class="row" style="margin-top:8px"><input id="cardPin" type="password" inputmode="numeric" maxlength="6" placeholder="6-digit PIN" style="width:160px" /><button class="secondary" id="factorCard">Unlock card and sign</button></div>
+        <div class="log" id="factorLog"></div>
+      </div>
+
+      <div class="step locked" id="s-partner">
+        <h3>c · The partner identifies you (Guardian A) <span class="badge mock">Mock</span></h3>
+        <p>In production: video identification against your ID, run by the partner. The partner then re-checks Guardian B's signature on-chain, signs, and submits the recovery.</p>
+        <div class="row" id="identRow"><button id="identOk">Simulate: it's me</button><button class="danger" id="identBad">Simulate: someone else</button></div>
+        <div class="log" id="partnerLog"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card hidden" id="pending">
+    <h2>Recovery pending</h2>
+    <p id="pendingText"></p>
+    <div class="row" style="margin-top:10px"><button id="finish" disabled>Finish recovery</button></div>
+    <div class="log" id="pendingLog"></div>
+  </section>
+
+  <footer>
+    This page talks only to the Base Sepolia RPC (<code>sepolia.base.org</code>), a public ERC-4337 bundler (<code>api.candide.dev</code>) and, for recovery, the partner's guardian (<code>/partner</code>). Gas is paid by a public paymaster, or by the wallet in ETH if none is available. Source: <code>web/services/rescue</code>.
+  </footer>
+</main>
+<script type="module" src="/app.js"></script>
+</body>
+</html>

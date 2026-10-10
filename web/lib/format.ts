@@ -22,8 +22,12 @@ export function formatUsdc(amount: bigint) {
   return formatNumber(toUnits(amount));
 }
 
+export function usdcChf(amount: bigint) {
+  return toUnits(amount) * USDC_CHF;
+}
+
 export function usdcToChf(amount: bigint) {
-  return formatNumber(toUnits(amount) * USDC_CHF);
+  return formatNumber(usdcChf(amount));
 }
 
 export function shortAddress(address?: string | null) {

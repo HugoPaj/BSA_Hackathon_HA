@@ -18,13 +18,14 @@ import { QuickActions } from '@/components/quick-actions';
 import { TradeSheet } from '@/components/trade-sheet';
 import { WalletSparkline } from '@/components/wallet-chart';
 import { useActivity, useWallet } from '@/lib/hooks';
-import { formatNumber, formatUsdc, usdcToChf } from '@/lib/format';
+import { formatNumber, toUnits, usdcChf } from '@/lib/format';
 import {
-  INSTRUMENTS, PERIOD_LABEL, formatPct, formatPrice, formatSigned, instrument, portfolioSeries, prevClose, priceSeries, useMarket, valuation,
+  INSTRUMENTS, PERIOD_LABEL, formatPrice, formatSigned, instrument, portfolioSeries, prevClose, priceSeries, useMarket, valuation,
   type Instrument, type MarketState, type Period, type Point,
 } from '@/lib/market';
 import { Bone, BoneCard, Skeleton } from '@/components/skeleton';
 import { cn } from '@/utils/cn';
+import { Num, PctNum, SignedNum } from '@/components/num';
 
 export default function Home() {
   const { signedIn } = useSession();
@@ -92,7 +93,6 @@ function RecoverPanel() {
       <Button.Root asChild className="mt-5 w-full">
         <Link href="/recover">Start recovery<Button.Icon as={RiArrowRightLine} /></Link>
       </Button.Root>
-      <p className="mt-4 text-center text-paragraph-xs text-text-soft-400">Swissquote never holds a key that can spend. It can only co-approve a passkey replacement.</p>
     </div>
   );
 }
@@ -151,8 +151,8 @@ function Dashboard() {
                 <span className="flex items-center gap-2 text-label-sm text-text-sub-600"><RiWallet3Line className="size-[18px] text-primary-base" />Self-custody wallet</span>
                 <RiArrowRightSLine className="size-5 text-text-soft-400" />
               </div>
-              <div className="mt-3 text-title-h4 tabular-nums text-text-strong-950">{formatUsdc(usdc)} <span className="text-label-lg text-text-soft-400">USDC</span></div>
-              <div className="text-paragraph-sm text-text-sub-600">≈ {usdcToChf(usdc)} CHF</div>
+              <div className="mt-3 text-title-h4 tabular-nums text-text-strong-950"><Num value={toUnits(usdc)} /> <span className="text-label-lg text-text-soft-400">USDC</span></div>
+              <div className="text-paragraph-sm text-text-sub-600">≈ <Num value={usdcChf(usdc)} /> CHF</div>
               <WalletSparkline activity={activity.data} balance={usdc} className="mt-3 min-h-14 w-full flex-1" />
               {data?.recovery?.status === 'pending'
                 ? <div className="mt-auto pt-3 text-label-sm text-warning-dark">Recovery pending · review it</div>
@@ -217,11 +217,11 @@ function TradingCard({ s }: { s: MarketState }) {
         Trading 2162953 <RiArrowRightSLine className="size-5 text-text-soft-400" />
       </Link>
       <div className="mt-3 flex items-center gap-2 text-[28px] font-medium tabular-nums leading-tight tracking-[-0.01em] text-text-strong-950 md:text-[32px]">
-        {formatNumber(scrub?.v ?? v.total)} <SwissFlag />
+        <Num value={scrub?.v ?? v.total} /> <SwissFlag />
       </div>
       <div className="mt-1 min-h-[42px] text-paragraph-sm text-text-sub-600">
         <div>
-          <span className={cn('text-label-sm', tone(change))}>{formatSigned(change)} CHF {change >= 0 ? '▲' : '▼'} {formatPct(change / start)}</span>{' '}
+          <span className={cn('text-label-sm', tone(change))}><SignedNum value={change} /> CHF {change >= 0 ? '▲' : '▼'} <PctNum value={change / start} /></span>{' '}
           {scrub ? `since ${formatChartTime(period)(series[0].t)}` : PERIOD_LABEL[period]}
         </div>
         {scrub

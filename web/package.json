@@ -3,10 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/dev.mjs",
+    "dev:web": "next dev",
+    "dev:no-swissquote": "node scripts/dev.mjs --no-swissquote",
+    "guardian": "GUARDIAN_ROLE=swissquote tsx services/guardian.ts",
+    "partner": "GUARDIAN_ROLE=partner tsx services/guardian.ts",
+    "rescue": "tsx services/rescue/server.mts",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "liveness": "tsx services/liveness.ts"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.3.12",
@@ -23,6 +29,7 @@
     "@radix-ui/react-toast": "^1.2.24",
     "@radix-ui/react-tooltip": "^1.3.0",
     "@remixicon/react": "^4.9.0",
+    "@sfinterface/numbers": "^0.3.4",
     "abstractionkit": "^0.4.3",
     "clsx": "^2.1.1",
     "jsqr": "^1.4.0",
@@ -45,10 +52,12 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "esbuild": "^0.28.2",
     "eslint": "^9",
     "eslint-config-next": "16.4.0",
     "puppeteer-core": "^25.13.0",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }

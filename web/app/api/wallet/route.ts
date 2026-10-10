@@ -2,8 +2,10 @@ import { isAddressEqual, type Hex } from 'viem';
 import { NODE_RPC } from '@/lib/config';
 import { counterfactualAddress, passkeySignerAddress, readWalletState, type GuardianB } from '@/lib/chain';
 import { audit, publicSession, read, write, type WalletRecord } from '@/lib/server/db';
-import { guardianAccount } from '@/lib/server/keys';
+import { guardianSafe } from '@/lib/server/guardians';
 import { body, currentClient, fail, json } from '@/lib/server/session';
+import { enrolledCard } from '@/lib/server/dnie';
+import { rsaGuardianAddress } from '@/lib/rsa-guardian';
 import { syncRecoveries } from '@/lib/server/recovery';
 
 export async function GET() {
@@ -34,9 +36,17 @@ export async function POST(req: Request) {
   const r = await body<Register>(req);
   const address = counterfactualAddress(r.owner);
   if (r.guardianB.type === 'passkey' && !isAddressEqual(r.guardianB.address as Hex, passkeySignerAddress(r.guardianB))) return fail('Recovery passkey address mismatch');
+  if (r.guardianB.type === 'dnie') {
+    // Take the card from the server's own record of the PIN-verified enrolment, never from the browser.
+    let card;
+    try { card = enrolledCard(client.clientId, r.guardianB.enrollId); } catch (e) { return fail((e as Error).message); }
+    const guardian = rsaGuardianAddress(address, card);
+    if (!isAddressEqual(r.guardianB.address as Hex, guardian)) return fail('DNI guardian address mismatch');
+    r.guardianB = { type: 'dnie', enrollId: r.guardianB.enrollId, address: guardian, ...card, label: card.simulated ? `Simulated DNI (${card.holder})` : `DNI of ${card.holder}` };
+  }
   if (!r.bankAssisted && !/^0x[0-9a-fA-F]{40}$/.test(r.contact ?? '')) return fail('A trusted contact address is needed when bank-assisted recovery is off');
   const guardianA: WalletRecord['guardianA'] = r.bankAssisted
-    ? { type: 'swissquote', address: guardianAccount().address, label: 'Swissquote (bank-assisted recovery)' }
+    ? { type: 'swissquote', address: (await guardianSafe()).address, label: 'Swissquote, or the independent partner if Swissquote cannot' }
     : { type: 'contact', address: r.contact!, label: 'Trusted contact' };
   const record: WalletRecord = {
     clientId: client.clientId,

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Suspense } from 'react';
 import { cookies } from 'next/headers';
+import '@sfinterface/numbers/styles.css';
 import './globals.css';
 import { SessionProvider } from '@/components/session';
 import { AppShell } from '@/components/app-shell';

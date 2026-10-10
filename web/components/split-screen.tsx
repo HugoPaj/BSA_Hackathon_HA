@@ -15,7 +15,7 @@ export function SplitScreen({ image, art, children, bannerClassName }: {
   return (
     <div className="grid flex-1 content-start bg-bg-white-0 lg:content-stretch lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
       <section className="p-3 pb-0 lg:p-4 lg:pr-0">
-        <div className={cn('relative isolate flex h-[360px] flex-col overflow-hidden rounded-3xl bg-bg-weak-50 sm:h-[440px] lg:sticky lg:top-[81px] lg:h-[calc(100dvh-97px)]', bannerClassName)}>
+        <div className={cn('relative isolate flex h-[360px] flex-col overflow-hidden rounded-3xl bg-bg-weak-50 sm:h-[440px] lg:sticky lg:top-4 lg:h-[calc(100dvh-97px)]', bannerClassName)}>
           <Image src={image} alt="" fill priority sizes="(min-width: 1024px) 55vw, 100vw" className="-z-20 animate-landing-zoom object-cover" />
           <div aria-hidden className="absolute inset-0 -z-10 bg-[radial-gradient(rgb(0_0_0/0.1)_0.6px,transparent_0.8px)] bg-[length:4px_4px] mix-blend-multiply" />
           {art && <>

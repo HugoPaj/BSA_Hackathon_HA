@@ -3,13 +3,17 @@ import { NODE_RPC } from '@/lib/config';
 import { readWalletState } from '@/lib/chain';
 import { audit, publicSession, read } from '@/lib/server/db';
 import { approveGuardianB, finalize, liveness, startRecovery, syncRecoveries } from '@/lib/server/recovery';
+import type { LivenessAttestation } from '@/lib/liveness';
+import { createDnieRequest, publicDnieRequest } from '@/lib/server/dnie';
+import { shortAddress } from '@/lib/format';
 import { bindRecovery, body, checkCredentials, createRecoverySession, destroyRecoverySession, fail, json, recoveryClient, upgradeRecoverySession } from '@/lib/server/session';
 
 type Req =
   | { action: 'identify'; clientId: string; password: string }
   | { action: 'start'; newOwner: { x: bigint; y: bigint; credentialId: string } }
   | { action: 'guardian'; id: string; signature: Hex }
-  | { action: 'liveness'; id: string; result: 'match' | 'mismatch' }
+  | { action: 'dnie'; id: string }
+  | { action: 'liveness'; id: string; attestation: LivenessAttestation }
   | { action: 'finalize'; id: string };
 
 export async function GET(req: Request) {
@@ -53,7 +57,16 @@ export async function POST(req: Request) {
     const session = read((db) => db.recoveries[b.id]);
     if (!session || session.clientId !== client.clientId) return fail('Unknown recovery request', 404);
     if (b.action === 'guardian') return json({ session: publicSession(await approveGuardianB(session, wallet, b.signature)) });
-    if (b.action === 'liveness') return json({ session: publicSession(await liveness(session, wallet, b.result)) });
+    if (b.action === 'dnie') {
+      // The DNI approves on a phone, which has no recovery cookie: hand it a single-use request instead.
+      if (wallet.guardianB.type !== 'dnie') return fail('This wallet does not use a DNI as recovery factor');
+      const r = createDnieRequest({
+        clientId: client.clientId, purpose: 'recovery', ref: session.id, hash: session.hash, title: 'Approve wallet recovery',
+        lines: [`Replace the owner of wallet ${shortAddress(session.wallet)}`, `with the new passkey ${shortAddress(session.newOwner.signer)}.`, 'Swissquote must also approve, then a safety delay runs that the current owner can cancel.'],
+      });
+      return json({ request: { ...publicDnieRequest(r), token: r.token } });
+    }
+    if (b.action === 'liveness') return json({ session: publicSession(await liveness(session, wallet, b.attestation)) });
     if (b.action === 'finalize') {
       const done = await finalize(session);
       // This device now holds the wallet's only passkey: the recovery session becomes a normal login.

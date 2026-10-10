@@ -19,9 +19,10 @@ import { Bone, BoneCard, BoneRow, Skeleton } from '@/components/skeleton';
 import { QuickActions } from '@/components/quick-actions';
 import { WalletBalanceChart } from '@/components/wallet-chart';
 import { useActivity, useWallet } from '@/lib/hooks';
-import { formatUsdc, shortAddress, usdcToChf } from '@/lib/format';
+import { formatUsdc, shortAddress, toUnits, usdcChf, usdcToChf } from '@/lib/format';
 import { CHAIN_NAME, EXPLORER, RECOVERY_DELAY_LABEL, RECOVERY_DELAY_PRODUCTION } from '@/lib/config';
 import { cn } from '@/utils/cn';
+import { Num } from '@/components/num';
 
 export default function WalletPage() {
   return <RequireLogin subtitle="Log in to see your wallet."><WalletHome /></RequireLogin>;
@@ -38,7 +39,7 @@ function WalletHome() {
   const isOwner = state.owners.some((o) => o.toLowerCase() === wallet.owner.signer.toLowerCase());
 
   const proof = wallet.proof;
-  const factor = wallet.guardianB.type === 'card' ? 'recovery card' : 'recovery passkey on another device';
+  const factor = wallet.guardianB.type === 'card' ? 'recovery card' : wallet.guardianB.type === 'dnie' ? 'DNI' : 'recovery passkey on another device';
 
   return (
     <div className="mx-auto grid max-w-[1080px] gap-6 lg:grid-cols-[1fr_340px]">
@@ -53,9 +54,9 @@ function WalletHome() {
             <CopyAddress address={wallet.address} />
           </div>
           <div className="mt-3 text-[32px] font-medium tabular-nums leading-tight tracking-[-0.01em] text-text-strong-950 md:text-[36px]">
-            {formatUsdc(state.usdc)} <span className="text-[0.5em] text-text-soft-400">USDC</span>
+            <Num value={toUnits(state.usdc)} /> <span className="text-[0.5em] text-text-soft-400">USDC</span>
           </div>
-          <div className="mt-1 text-paragraph-sm text-text-sub-600">≈ {usdcToChf(state.usdc)} CHF</div>
+          <div className="mt-1 text-paragraph-sm text-text-sub-600">≈ <Num value={usdcChf(state.usdc)} /> CHF</div>
           <WalletBalanceChart activity={activity.data} balance={state.usdc} className="mt-5" />
           <QuickActions className="mt-6" actions={[
             { icon: RiArrowRightUpLine, label: 'Send', href: '/wallet/send', primary: true },

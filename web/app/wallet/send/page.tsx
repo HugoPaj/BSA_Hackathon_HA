@@ -14,7 +14,7 @@ import { Bone, BoneCard, Skeleton } from '@/components/skeleton';
 import { useWallet } from '@/lib/hooks';
 import { useConfig } from '@/lib/use-config';
 import { useTxFlow } from '@/lib/use-tx-flow';
-import { transferTx } from '@/lib/chain';
+import { factorName, transferTx } from '@/lib/chain';
 import { formatUsdc, parseUsdc, shortAddress, usdcToChf } from '@/lib/format';
 import { CONTACTS, SERVICE_FEE, STEP_UP_THRESHOLD } from '@/lib/config';
 import { cn } from '@/utils/cn';
@@ -81,7 +81,7 @@ function SendForm({ data, cfg, to, setTo, amountText, setAmountText, open, setOp
             <span>+ {formatUsdc(SERVICE_FEE)} USDC Swissquote fee, gas included</span>
           </div>
           {insufficient && <Hint.Root hasError>Not enough USDC: this amount plus the {formatUsdc(SERVICE_FEE)} USDC fee is more than your balance, so the transfer would fail.</Hint.Root>}
-          {!insufficient && amount && amount >= STEP_UP_THRESHOLD && <Hint.Root className="text-primary-dark">Above {formatUsdc(STEP_UP_THRESHOLD)} USDC your {wallet.guardianB.type === 'passkey' ? 'recovery device' : 'recovery card'} confirms too.</Hint.Root>}
+          {!insufficient && amount && amount >= STEP_UP_THRESHOLD && <Hint.Root className="text-primary-dark">Above {formatUsdc(STEP_UP_THRESHOLD)} USDC your {factorName(wallet.guardianB.type)} confirms too.</Hint.Root>}
         </div>
 
         <Button.Root className="h-12 w-full" disabled={!canReview} onClick={() => {

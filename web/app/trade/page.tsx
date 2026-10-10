@@ -6,12 +6,13 @@ import { RiArrowDownLine, RiArrowLeftRightLine, RiArrowRightSLine, RiArrowUpLine
 import * as TabMenu from '@/components/ui/tab-menu-horizontal';
 import { RequireLogin } from '@/components/require-login';
 import { InstrumentLogo, InstrumentRow } from '@/components/market-ui';
-import { formatNumber } from '@/lib/format';
 import {
   FX, INSTRUMENTS, formatPct, formatPrice, formatQty, formatSigned, instrument, prevClose, useMarket, valuation,
   type Instrument, type Kind, type MarketState,
 } from '@/lib/market';
 import { cn } from '@/utils/cn';
+import { Num, SignedNum } from '@/components/num';
+import { formatNumber } from '@/lib/format';
 
 const CATS: { id: string; label: string; title: string; kinds: Kind[] }[] = [
   { id: 'smi', label: 'Components', title: 'Components of the SMI', kinds: ['smi'] },
@@ -163,8 +164,8 @@ function AccountSummary({ s }: { s: MarketState }) {
   return (
     <section className="rounded-3xl bg-bg-white-0 p-5 ring-1 ring-inset ring-stroke-soft-200">
       <div className="text-paragraph-sm text-text-sub-600">Trading 2162953</div>
-      <div className="mt-1 text-title-h5 tabular-nums text-text-strong-950">{formatNumber(v.total)} <span className="text-label-md text-text-soft-400">CHF</span></div>
-      <div className={cn('text-label-sm tabular-nums', v.dayChange >= 0 ? 'text-success-base' : 'text-error-base')}>{formatSigned(v.dayChange)} CHF today</div>
+      <div className="mt-1 text-title-h5 tabular-nums text-text-strong-950"><Num value={v.total} /> <span className="text-label-md text-text-soft-400">CHF</span></div>
+      <div className={cn('text-label-sm tabular-nums', v.dayChange >= 0 ? 'text-success-base' : 'text-error-base')}><SignedNum value={v.dayChange} /> CHF today</div>
       <div className="mt-4 flex justify-between border-t border-stroke-soft-200 pt-3 text-paragraph-sm">
         <span className="text-text-sub-600">Buying power</span>
         <span className="tabular-nums text-text-strong-950">{formatNumber(v.buyingPower)} CHF</span>

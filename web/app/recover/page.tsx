@@ -14,10 +14,12 @@ import { SplitScreen } from '@/components/split-screen';
 import { Bone, BoneLines, Skeleton } from '@/components/skeleton';
 import { CardUnlock } from '@/components/card-unlock';
 import { MockTag } from '@/components/brand';
+import type { LivenessAttestation } from '@/lib/liveness';
 import { useSession } from '@/components/session';
 import { api, ApiError } from '@/lib/api';
 import { createPasskey, hexToBytes, signWithPasskey, type Passkey } from '@/lib/passkey';
-import { Safe, type WalletState } from '@/lib/chain';
+import { factorName, Safe, type WalletState } from '@/lib/chain';
+import { DnieSign, type DnieRequest } from '@/components/dnie-sign';
 import { friendly, type CardSigner } from '@/lib/use-tx-flow';
 import { saveDevice } from '@/lib/device';
 import { useNow } from '@/lib/hooks';
@@ -86,7 +88,6 @@ export default function RecoverPage() {
             <h2 className="text-title-h4 text-text-strong-950">Identify yourself</h2>
             <p className="mt-2 text-paragraph-md text-text-sub-600">Use your Swissquote client number and password. This only opens the recovery: you are not logged in to your account on this device until your new passkey takes over.</p>
           </div>
-          <MockTag>Mock login</MockTag>
         </div>
         <LoginForm label="Continue" busyLabel="Checking…" submit={async (clientId, password) => { await api('/api/recovery', { action: 'identify', clientId, password }); await load(); }} />
       </Panel>,
@@ -189,7 +190,8 @@ function Panel({ children, className }: { children: React.ReactNode; className?:
 }
 
 function NewPasskey({ info, onCreated }: { info: Info; onCreated: (p: Passkey) => void }) {
-  const { client } = useSession();
+  // The recovery identification, not a login: on a new device there is no logged-in session.
+  const { client } = info;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   return (
@@ -202,7 +204,7 @@ function NewPasskey({ info, onCreated }: { info: Info; onCreated: (p: Passkey) =
       {!info.wallet!.bankAssisted && <Alert.Root status="warning" variant="lighter" size="small"><Alert.Icon />This wallet uses a trusted contact instead of Swissquote. Ask them to approve your request.</Alert.Root>}
       <FancyButton.Root variant="primary" className="h-12 w-full" disabled={busy || !!info.state?.recovery} onClick={async () => {
         setBusy(true); setError(null);
-        try { onCreated(await createPasskey({ userName: `client-${client!.clientId}`, displayName: client!.name, purpose: 'wallet' })); } catch (e) { setError(friendly(e)); } finally { setBusy(false); }
+        try { onCreated(await createPasskey({ userName: `client-${client.clientId}`, displayName: client.name, purpose: 'wallet' })); } catch (e) { setError(friendly(e)); } finally { setBusy(false); }
       }}><FancyButton.Icon as={RiFingerprintLine} />{busy ? 'Waiting for your device…' : 'Create new passkey'}</FancyButton.Root>
       {error && <Alert.Root status="error" variant="lighter" size="small"><Alert.Icon />{error}</Alert.Root>}
     </Panel>
@@ -245,13 +247,15 @@ function GuardianB({ info, session, onDone }: { info: Info; session: PublicRecov
   return (
     <Panel>
       <div>
-        <h2 className="text-title-h4 text-text-strong-950">Approve with your {gB.type === 'passkey' ? 'recovery device' : 'recovery card'}</h2>
+        <h2 className="text-title-h4 text-text-strong-950">Approve with your {factorName(gB.type)}</h2>
         <p className="mt-2 text-paragraph-md text-text-sub-600">
-          {gB.type === 'passkey' ? 'Your browser will ask for the recovery passkey. Choose “Use another device” and scan the QR code with the phone or laptop that holds it, or use your security key.' : 'Use the recovery card you printed or copied when you created your wallet, plus the PIN you chose for it. The card key signs the request in this browser and is never sent anywhere.'}
+          {gB.type === 'dnie' ? `Your ID card approves this exact request. Open the Swissquote ID app on an Android phone, enter the CAN printed on the card and your PIN, and hold the DNI to the phone. The wallet's guardian contract checks the card's signature on-chain.` : gB.type === 'passkey' ? 'Your browser will ask for the recovery passkey. Choose “Use another device” and scan the QR code with the phone or laptop that holds it, or use your security key.' : 'Use the recovery card you printed or copied when you created your wallet, plus the PIN you chose for it. The card key signs the request in this browser and is never sent anywhere.'}
         </p>
       </div>
       <div className="rounded-xl bg-bg-weak-50 p-3 font-mono text-[11px] leading-relaxed text-text-sub-600">ExecuteRecovery(wallet {shortAddress(session.wallet)}, newOwners [{shortAddress(session.newOwner.signer)}], newThreshold 1, nonce {session.nonce})</div>
-      {gB.type === 'passkey' ? (
+      {gB.type === 'dnie' ? (
+        <DnieSign create={() => api<{ request: DnieRequest }>('/api/recovery', { action: 'dnie', id: session.id }).then((r) => r.request)} onDone={onDone} />
+      ) : gB.type === 'passkey' ? (
         <FancyButton.Root variant="neutral" className="h-12 w-full" disabled={busy} onClick={async () => {
           setBusy(true); setError(null);
           try { const sig = await signWithPasskey([gB.credentialId], hexToBytes(session.hash)); await submit(Safe.createWebAuthnSignature(sig)); } catch (e) { setError(friendly(e)); } finally { setBusy(false); }
@@ -270,6 +274,14 @@ function GuardianB({ info, session, onDone }: { info: Info; session: PublicRecov
       )}
     </Panel>
   );
+}
+
+/** The liveness vendor's API (proxied unchanged by /liveness/*). */
+async function vendor<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const out = await res.json().catch(() => ({ error: 'The liveness vendor is offline' }));
+  if (!res.ok) throw new Error(out.error ?? 'The liveness vendor is offline');
+  return out as T;
 }
 
 function Liveness({ session, onDone }: { session: PublicRecoverySession; onDone: () => void }) {
@@ -293,7 +305,12 @@ function Liveness({ session, onDone }: { session: PublicRecoverySession; onDone:
   };
   const send = async (result: 'match' | 'mismatch') => {
     setBusy(result); setError(null);
-    try { await api('/api/recovery', { action: 'liveness', id: session.id, result }); } catch (e) { setError((e as Error).message); } finally { setBusy(false); (video.current?.srcObject as MediaStream | null)?.getTracks().forEach((t) => t.stop()); onDone(); }
+    try {
+      // As the vendor's SDK would: open a session for this exact request, get the vendor-signed verdict, hand it on.
+      const { session: vendorSession } = await vendor<{ session: string }>('/liveness/sessions', { subject: session.clientId, wallet: session.wallet, request: session.hash });
+      const { attestation } = await vendor<{ attestation: LivenessAttestation }>('/liveness/sessions/complete', { session: vendorSession, result });
+      await api('/api/recovery', { action: 'liveness', id: session.id, attestation });
+    } catch (e) { setError((e as Error).message); } finally { setBusy(false); (video.current?.srcObject as MediaStream | null)?.getTracks().forEach((t) => t.stop()); onDone(); }
   };
   return (
     <Panel>
@@ -302,7 +319,7 @@ function Liveness({ session, onDone }: { session: PublicRecoverySession; onDone:
           <h2 className="text-title-h4 text-text-strong-950">Face check against your ID</h2>
           <p className="mt-2 text-paragraph-md text-text-sub-600">Swissquote&apos;s guardian key signs only after a live face match against your KYC file, approved by two operators. An e-mail link or SMS code is never enough.</p>
         </div>
-        <MockTag>Mock liveness</MockTag>
+        <MockTag>Mock face analysis</MockTag>
       </div>
       <div className="relative mx-auto grid aspect-square w-full max-w-[260px] place-items-center overflow-hidden rounded-full bg-[#323232]">
         <video ref={video} playsInline muted className={cn('absolute inset-0 size-full -scale-x-100 object-cover', cam === 'on' ? 'opacity-100' : 'opacity-0')} />
@@ -319,7 +336,7 @@ function Liveness({ session, onDone }: { session: PublicRecoverySession; onDone:
         </div>
       )}
       {error && <Alert.Root status="error" variant="lighter" size="small"><Alert.Icon />{error}</Alert.Root>}
-      <p className="text-center text-paragraph-xs text-text-soft-400">Demo: choose the outcome. “Someone else” plays the attacker who has your phone and e-mail.</p>
+      <p className="text-center text-paragraph-xs text-text-soft-400">Demo: choose the outcome. “Someone else” plays the attacker who has your phone and e-mail. The liveness vendor signs the verdict, and Swissquote&apos;s guardian checks that signature itself.</p>
     </Panel>
   );
 }

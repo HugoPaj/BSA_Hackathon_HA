@@ -2,6 +2,7 @@
 // Usage: node scripts/e2e-api.mjs [baseUrl]   (dev server must be running)
 import { SafeAccountV0_3_0 as Safe, SocialRecoveryModule, fromSafeWebauthn } from 'abstractionkit';
 import { encodeFunctionData, parseAbi } from 'viem';
+import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { createSoftPasskey } from './webauthn-sim.mjs';
 
 const BASE = process.argv[2] ?? 'http://localhost:3000';
@@ -86,13 +87,22 @@ for (const [label, txs] of [
   log('4', label, '→', r.evaluation.decision, r.status ?? '', '|', r.evaluation.checks.filter((c) => c.status !== 'pass').map((c) => `${c.id}:${c.status} (${c.detail})`).join('; ') || 'all pass');
 }
 
+// Liveness: the browser gets a signed verdict from the vendor (proxied at /liveness) and hands it to the backend.
+const vendor = async (path, body) => { const r = await fetch(BASE + '/liveness' + path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); const o = await r.json(); if (!r.ok) throw new Error(o.error); return o; };
+async function verdict(s, result, request = s.hash) {
+  const { session } = await vendor('/sessions', { subject: '2162953', wallet: s.wallet, request });
+  return (await vendor('/sessions/complete', { session, result })).attestation;
+}
+const liveness = async (s, result) => api('/api/recovery', { action: 'liveness', id: s.id, attestation: await verdict(s, result) });
+const LIVENESS_TYPES = { LivenessAttestation: [{ name: 'session', type: 'string' }, { name: 'subject', type: 'string' }, { name: 'wallet', type: 'address' }, { name: 'request', type: 'bytes32' }, { name: 'match', type: 'bool' }, { name: 'issuedAt', type: 'uint64' }] };
+
 // 5. Attack: wrong recovery factor, failed liveness
 const attackerKey = mk();
 const s1 = (await api('/api/recovery', { action: 'start', newOwner: { ...attackerKey.publicKey, credentialId: 'attacker' } })).session;
 const bad = Safe.createWebAuthnSignature(await attackerKey.getAssertion(Buffer.from(s1.hash.slice(2), 'hex')));
 await expectFail(api('/api/recovery', { action: 'guardian', id: s1.id, signature: bad }), 'attacker signs as Guardian B');
-await expectFail(api('/api/recovery', { action: 'liveness', id: s1.id, result: 'mismatch' }), 'attacker face vs KYC file');
-await expectFail(api('/api/recovery', { action: 'liveness', id: s1.id, result: 'match' }), 'retrying liveness on a refused request');
+await expectFail(liveness(s1, 'mismatch'), 'attacker face vs KYC file');
+await expectFail(liveness(s1, 'match'), 'retrying liveness on a refused request');
 await expectFail(api('/api/recovery', { action: 'finalize', id: s1.id }), 'finalizing a refused request');
 
 // 6. Legit recovery, from a new device: identifying for recovery must not log in
@@ -107,7 +117,19 @@ log('  ✓ recovery identification is not a login');
 const newOwner = mk();
 const s = (await api('/api/recovery', { action: 'start', newOwner: { ...newOwner.publicKey, credentialId: 'new' } })).session;
 const gSig = Safe.createWebAuthnSignature(await gB.getAssertion(Buffer.from(s.hash.slice(2), 'hex')));
-const early = (await api('/api/recovery', { action: 'liveness', id: s.id, result: 'match' })).session;
+// A compromised backend has a valid Guardian B signature but no genuine liveness verdict.
+const forger = privateKeyToAccount(generatePrivateKey());
+const fake = { session: 'forged', subject: '2162953', wallet: s.wallet, request: s.hash, match: true, issuedAt: Math.floor(Date.now() / 1000) };
+const forged = { ...fake, signature: await forger.signTypedData({ domain: { name: 'Liveness vendor (mock)', version: '1', chainId: 84532 }, types: LIVENESS_TYPES, primaryType: 'LivenessAttestation', message: { ...fake, issuedAt: BigInt(fake.issuedAt) } }) };
+await expectFail(api('/api/recovery', { action: 'liveness', id: s.id, attestation: forged }), 'liveness verdict signed by someone other than the vendor');
+await expectFail(api('/api/recovery', { action: 'liveness', id: s.id, attestation: { ...(await verdict(s, 'mismatch')), match: true } }), 'vendor "mismatch" verdict edited to "match"');
+await expectFail(api('/api/recovery', { action: 'liveness', id: s.id, attestation: await verdict(s, 'match', '0x' + 'ab'.repeat(32)) }), 'genuine "match" verdict for a different recovery request');
+const toGuardian = async (identity) => { const r = await fetch('http://127.0.0.1:4101/approve', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ wallet: s.wallet, guardian: cfg.swissquoteGuardian, newOwner: s.newOwner.signer, guardianBSignature: gSig, identity }) }); const o = await r.json(); if (!r.ok) throw new Error(o.error); return o; };
+const ownershipProof = { message: ch.message, signature: proofSig };
+await expectFail(toGuardian({ method: 'kyc-liveness', result: 'match' }), 'backend asks the guardian directly, claiming "match" without a verdict');
+await expectFail(toGuardian({ method: 'kyc-liveness', attestation: forged, ownershipProof }), 'backend hands the guardian a forged verdict + real ownership proof');
+await expectFail(toGuardian({ method: 'kyc-liveness', attestation: await verdict(s, 'match'), ownershipProof: { message: ch.message.replace('2162953', '9999999'), signature: proofSig } }), 'backend rewrites the ownership proof to another client');
+const early = (await liveness(s, 'match')).session;
 if (early.swissquote || early.status !== 'collecting') throw new Error('HSM signed before Guardian B approved');
 log('  ✓ liveness first: HSM waits for Guardian B');
 const after = (await api('/api/recovery', { action: 'guardian', id: s.id, signature: gSig })).session;

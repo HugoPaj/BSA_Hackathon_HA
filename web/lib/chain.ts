@@ -12,11 +12,14 @@ import {
   getAddress,
   http,
   parseAbi,
+  hashTypedData,
   type Hex,
   isAddressEqual,
+  type TypedDataDefinition,
 } from 'viem';
 import { baseSepolia } from 'viem/chains';
-import { RECOVERY_MODULE, USDC } from './config';
+import { CHAIN_ID, RECOVERY_MODULE, USDC } from './config';
+import { deployRsaGuardianTx, isRsaGuardianDeploy, type RsaPublicKey } from './rsa-guardian';
 
 export { Safe };
 export const srm = new SocialRecoveryModule(RECOVERY_MODULE);
@@ -56,7 +59,22 @@ export function client(rpcUrl: string) {
 export type PublicKey = { x: bigint; y: bigint };
 export type GuardianB =
   | { type: 'passkey'; x: bigint; y: bigint; credentialId: string; address: string }
-  | { type: 'card'; address: string };
+  | { type: 'card'; address: string }
+  | ({ type: 'dnie'; address: string; enrollId: string } & DnieCard);
+
+/** A national ID card enrolled as Guardian B (Spanish DNIe). Only its public key goes on-chain, in an RsaGuardian. */
+export type DnieCard = RsaPublicKey & {
+  holder: string; // name on the card's certificate
+  documentId: string; // masked document number, for display
+  issuer: string; // issuing CA, e.g. "AC DNIE 006"
+  notAfter: number; // certificate expiry (ms)
+  simulated: boolean; // demo stand-in generated in the browser, not a real card
+};
+
+/** How the UI names each kind of Guardian B. */
+export function factorName(type: GuardianB['type']) {
+  return type === 'passkey' ? 'recovery device' : type === 'dnie' ? 'DNI' : 'recovery card';
+}
 
 /** Address of the per-key SafeWebAuthnSignerProxy for a passkey. This is what the Safe lists as owner. */
 export function passkeySignerAddress(pub: PublicKey) {
@@ -71,10 +89,19 @@ export function counterfactualAddress(pub: PublicKey) {
 export function setupTransactions(wallet: string, guardianA: string, guardianB: GuardianB): MetaTransaction[] {
   const txs: MetaTransaction[] = [];
   if (guardianB.type === 'passkey') txs.push(Safe.createDeployWebAuthnVerifierMetaTransaction(guardianB.x, guardianB.y));
+  if (guardianB.type === 'dnie') txs.push(deployRsaGuardianTx(wallet, guardianB));
   txs.push(Safe.createEnableModuleMetaTransaction(RECOVERY_MODULE, wallet));
   txs.push(srm.createAddGuardianWithThresholdMetaTransaction(guardianA, 1n));
   txs.push(srm.createAddGuardianWithThresholdMetaTransaction(guardianB.address, 2n));
   return txs;
+}
+
+/** The EIP-712 recovery request every guardian signs: "make this signer the only owner, threshold 1". */
+export async function recoveryRequest(rpcUrl: string, wallet: string, newOwnerSigner: string, nonce?: bigint) {
+  const n = nonce ?? (await srm.nonce(rpcUrl, wallet));
+  const ed = await srm.getRecoveryRequestEip712Data(rpcUrl, CHAIN_ID, wallet, [newOwnerSigner], 1n, { recoveryNonce: n });
+  const typedData = { domain: ed.domain, types: ed.types, primaryType: 'ExecuteRecovery', message: ed.messageValue } as unknown as TypedDataDefinition;
+  return { typedData, hash: hashTypedData(typedData), nonce: n };
 }
 
 export function transferTx(to: string, amount: bigint): MetaTransaction {
@@ -144,6 +171,7 @@ export function classifyCall(call: Call, wallet: string): DecodedCall {
       };
       if (names[d.functionName]) return { kind: 'security', action: names[d.functionName] };
     }
+    if (isRsaGuardianDeploy(call.to, call.data)) return { kind: 'security', action: 'Register your DNI as recovery guardian' };
     if (isAddressEqual(call.to as Hex, SIGNER_FACTORY as Hex)) {
       decodeFunctionData({ abi: factoryAbi, data: call.data });
       return { kind: 'security', action: 'Register a passkey signer' };

@@ -37,7 +37,7 @@ export async function POST(req: Request) {
     audit({ actor: 'Compliance', action: 'Ownership proof rejected', wallet: wallet.address, detail: 'Signature did not verify against the current owner', outcome: 'declined' });
     return fail('The signature did not verify against the wallet owner');
   }
-  const proof = { verifiedAt: Date.now(), signer: wallet.owner.signer, message: ch.callDataHash.slice(6), method: 'EIP-1271 isValidSignature on the owner signer contract' };
+  const proof = { verifiedAt: Date.now(), signer: wallet.owner.signer, message: ch.callDataHash.slice(6), method: 'EIP-1271 isValidSignature on the owner signer contract', signature: b.signature };
   write((db) => { db.wallets[client.clientId].proof = proof; delete db.stepUps[b.challengeId]; });
   audit({ actor: 'Compliance', action: 'Ownership proof archived', wallet: wallet.address, detail: `Verified on-chain via EIP-1271 (signer ${wallet.owner.signer})`, outcome: 'approved' });
   alert(wallet.address, { severity: 'success', title: 'Wallet ownership verified', body: 'Swissquote verified automatically that you control this wallet. Transfers from your Swissquote account need no manual checks.', channels: ['In-app'] });

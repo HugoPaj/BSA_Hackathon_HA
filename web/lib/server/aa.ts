@@ -1,10 +1,10 @@
 import 'server-only';
 // Swissquote's side of ERC-4337: the gas sponsor and the operations Safe (relayer, treasury, fee collector).
-import { CandidePaymaster, fromPrivateKey, type MetaTransaction, type UserOperationV7 } from 'abstractionkit';
-import { getAddress } from 'viem';
+import { CandidePaymaster, type MetaTransaction, type UserOperationV7 } from 'abstractionkit';
 import { BUNDLER_RPC, CHAIN_ID, NODE_RPC, PAYMASTER_RPC } from '../config';
 import { Safe } from '../chain';
-import { opsOwnerAddress, opsSigner } from './keys';
+import { createRelayer } from '../relayer';
+import { opsSigner } from './keys';
 
 const paymaster = new CandidePaymaster(PAYMASTER_RPC);
 const sponsorshipPolicyId = process.env.SPONSORSHIP_POLICY_ID || undefined;
@@ -19,29 +19,16 @@ export async function sponsor(op: UserOperationV7) {
   return userOperation as UserOperationV7;
 }
 
+const ops = () => (relayer ??= createRelayer({ key: opsSigner(), nodeRpc: NODE_RPC, bundlerRpc: BUNDLER_RPC, paymasterRpc: PAYMASTER_RPC, chainId: CHAIN_ID, sponsorshipPolicyId }));
+let relayer: ReturnType<typeof createRelayer> | undefined;
+
 export function opsAddress() {
-  return getAddress(Safe.createAccountAddress([opsOwnerAddress()]));
+  return ops().address;
 }
 
-let queue: Promise<unknown> = Promise.resolve();
-
-/** Send transactions from Swissquote's operations Safe, gas-sponsored. Serialised to avoid nonce races. */
-export function relay(txs: MetaTransaction[]): Promise<{ userOpHash: string; txHash: string }> {
-  const run = async () => {
-    const address = opsAddress();
-    const deployed = await Safe.isDeployed(address, NODE_RPC);
-    const account = deployed ? new Safe(address) : Safe.initializeNewAccount([opsOwnerAddress()]);
-    let op = await account.createUserOperation(txs, NODE_RPC, BUNDLER_RPC);
-    op = (await paymaster.createSponsorPaymasterUserOperation(account, op, BUNDLER_RPC, sponsorshipPolicyId)).userOperation;
-    op.signature = await account.signUserOperationWithSigners(op, [fromPrivateKey(opsSigner())], CHAIN_ID);
-    const res = await account.sendUserOperation(op, BUNDLER_RPC);
-    const receipt = await res.included();
-    if (!receipt?.success) throw new Error(`Relayed operation failed (${receipt?.receipt?.transactionHash ?? res.userOperationHash})`);
-    return { userOpHash: res.userOperationHash, txHash: receipt.receipt.transactionHash };
-  };
-  const p = queue.then(run, run);
-  queue = p.catch(() => undefined);
-  return p;
+/** Send transactions from Swissquote's operations Safe, gas-sponsored. */
+export function relay(txs: MetaTransaction[]) {
+  return ops().relay(txs);
 }
 
 export async function bundlerRequest(method: string, params: unknown[]) {

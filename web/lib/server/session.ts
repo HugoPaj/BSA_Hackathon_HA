@@ -48,7 +48,7 @@ export async function destroyRecoverySession() {
   jar.set(RECOVERY_COOKIE, '', { path: RECOVERY_PATH, maxAge: 0 });
 }
 
-function toClient(clientId: string): Client | null {
+export function toClient(clientId: string): Client | null {
   const c = CLIENTS[clientId];
   return c ? { clientId: c.clientId, name: c.name, email: c.email } : null;
 }

@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   RiBankLine, RiCheckLine, RiFileCopyLine, RiFingerprintLine, RiKey2Line, RiMacbookLine, RiShieldCheckFill, RiShieldKeyholeLine,
-  RiTimeLine, RiUserHeartLine, RiCheckboxCircleFill, RiArrowRightLine, RiIdCardLine,
+  RiTimeLine, RiUserHeartLine, RiCheckboxCircleFill, RiArrowRightLine, RiIdCardLine, RiQrCodeLine,
 } from '@remixicon/react';
 import * as FancyButton from '@/components/ui/fancy-button';
 import * as Button from '@/components/ui/button';
@@ -21,6 +21,8 @@ import { useSession } from '@/components/session';
 import { createPasskey, passkeysSupported, signWithPasskey, hexToBytes, type Passkey } from '@/lib/passkey';
 import { createRecoveryCard } from '@/lib/card';
 import { counterfactualAddress, passkeySignerAddress, setupTransactions, Safe, type GuardianB } from '@/lib/chain';
+import { rsaGuardianAddress } from '@/lib/rsa-guardian';
+import { DnieSign, type DnieRequest } from '@/components/dnie-sign';
 import { useTxFlow, friendly } from '@/lib/use-tx-flow';
 import { api } from '@/lib/api';
 import { saveDevice } from '@/lib/device';
@@ -55,7 +57,7 @@ function Onboarding() {
       <div key={step} className="animate-fade-in-up">
         {step === 'intro' && <Intro onNext={() => setStep('passkey')} />}
         {step === 'passkey' && <PasskeyStep owner={owner} setOwner={setOwner} onNext={() => setStep('factor')} />}
-        {step === 'factor' && <FactorStep factor={factor} setFactor={setFactor} onNext={() => setStep('settings')} />}
+        {step === 'factor' && owner && <FactorStep wallet={counterfactualAddress(owner)} factor={factor} setFactor={setFactor} onNext={() => setStep('settings')} />}
         {step === 'settings' && <SettingsStep bankAssisted={bankAssisted} setBankAssisted={setBankAssisted} contact={contact} setContact={setContact} factor={factor!} onNext={() => setStep('create')} />}
         {step === 'create' && owner && factor && <CreateStep owner={owner} factor={factor} bankAssisted={bankAssisted} contact={contact} onNext={() => setStep('proof')} />}
         {step === 'proof' && owner && <ProofStep owner={owner} />}
@@ -123,9 +125,9 @@ function PasskeyStep({ owner, setOwner, onNext }: { owner: Passkey | null; setOw
   );
 }
 
-function FactorStep({ factor, setFactor, onNext }: { factor: Factor; setFactor: (f: Factor) => void; onNext: () => void }) {
+function FactorStep({ wallet, factor, setFactor, onNext }: { wallet: string; factor: Factor; setFactor: (f: Factor) => void; onNext: () => void }) {
   const { client } = useSession();
-  const [choice, setChoice] = useState<'passkey' | 'card'>('passkey');
+  const [choice, setChoice] = useState<'dnie' | 'passkey' | 'card'>('dnie');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pin, setPin] = useState('');
@@ -140,10 +142,11 @@ function FactorStep({ factor, setFactor, onNext }: { factor: Factor; setFactor: 
         <p className="mt-1 text-paragraph-sm text-text-sub-600">This is <b>Guardian B</b>: something only you have, kept away from this device. Recovery always needs it, so a thief with your phone and e-mail still cannot take over the wallet. It can never spend.</p>
       </div>
       {!factor && (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-3">
           {([
+            { id: 'dnie', icon: RiIdCardLine, t: 'Your Spanish DNI', d: 'Tap your ID card on an Android phone, PIN-protected', tag: 'No extra device' },
             { id: 'passkey', icon: RiMacbookLine, t: 'Passkey on another device', d: 'Your laptop, a second phone or a security key', tag: 'Recommended' },
-            { id: 'card', icon: RiIdCardLine, t: 'Recovery card', d: 'A printable code locked with a 6-digit PIN', tag: 'Offline' },
+            { id: 'card', icon: RiQrCodeLine, t: 'Recovery card', d: 'A printable code locked with a 6-digit PIN', tag: 'Offline' },
           ] as const).map((o) => (
             <button key={o.id} onClick={() => setChoice(o.id)} className={cn('rounded-2xl p-4 text-left ring-1 ring-inset transition active:scale-[0.98]', choice === o.id ? 'bg-primary-alpha-10 ring-primary-base' : 'bg-bg-white-0 ring-stroke-soft-200 hover:bg-bg-weak-50')}>
               <div className="flex items-center justify-between"><o.icon className={cn('size-6', choice === o.id ? 'text-primary-base' : 'text-text-sub-600')} /><span className="text-label-xs text-text-soft-400">{o.tag}</span></div>
@@ -152,6 +155,17 @@ function FactorStep({ factor, setFactor, onNext }: { factor: Factor; setFactor: 
             </button>
           ))}
         </div>
+      )}
+
+      {!factor && choice === 'dnie' && (
+        <DnieSign
+          create={() => api<DnieRequest>('/api/dnie', { action: 'create', purpose: 'enroll' })}
+          onDone={(r) => {
+            const card = r.card!;
+            setFactor({ type: 'dnie', enrollId: r.id, address: rsaGuardianAddress(wallet, card), ...card, label: card.simulated ? `Simulated DNI (${card.holder})` : `DNI of ${card.holder}` });
+          }}
+          intro={<p className="text-paragraph-sm text-text-sub-600">Your DNI&apos;s signature key (the one you sign official documents with) becomes Guardian B. Its PIN protects it, the police reissue it if you lose it, and only its public key goes on-chain, in a small guardian contract.</p>}
+        />
       )}
 
       {!factor && choice === 'passkey' && (
@@ -205,7 +219,7 @@ function FactorStep({ factor, setFactor, onNext }: { factor: Factor; setFactor: 
       {factor && (
         <div className="flex items-center gap-3 rounded-2xl bg-success-lighter p-4">
           <RiCheckboxCircleFill className="size-6 shrink-0 text-success-base" />
-          <div className="min-w-0"><div className="text-label-sm text-text-strong-950">{factor.label} added</div><div className="truncate font-mono text-paragraph-xs text-text-sub-600">Guardian address {shortAddress(factor.address)}</div></div>
+          <div className="min-w-0"><div className="text-label-sm text-text-strong-950">{factor.label} added</div>{factor.type === 'dnie' && <div className="text-paragraph-xs text-text-sub-600">{factor.documentId} · {factor.issuer} · PIN verified</div>}<div className="truncate font-mono text-paragraph-xs text-text-sub-600">Guardian {factor.type === 'dnie' ? 'contract' : 'address'} {shortAddress(factor.address)}</div></div>
         </div>
       )}
       {error && <Alert.Root status="error" variant="lighter" size="small"><Alert.Icon />{error}</Alert.Root>}
@@ -226,12 +240,12 @@ function SettingsStep({ bankAssisted, setBankAssisted, contact, setContact, fact
         <div className="rounded-2xl bg-bg-weak-50 p-4">
           <div className="text-subheading-2xs uppercase tracking-wider text-text-soft-400">Guardian A</div>
           <div className="mt-2 flex items-center gap-2 text-label-sm text-text-strong-950">{bankAssisted ? <RiBankLine className="size-5 text-primary-base" /> : <RiUserHeartLine className="size-5 text-primary-base" />}{bankAssisted ? 'Swissquote' : 'Trusted contact'}</div>
-          <div className="mt-1 text-paragraph-xs text-text-sub-600">{bankAssisted ? 'Approves only after e-banking login and a live face match against your ID.' : 'Someone you trust approves from their own wallet.'}</div>
+          <div className="mt-1 text-paragraph-xs text-text-sub-600">{bankAssisted ? 'Approves only after e-banking login and a live face match against your ID. If Swissquote is ever unavailable, an independent partner can approve in its place.' : 'Someone you trust approves from their own wallet.'}</div>
         </div>
         <div className="grid place-items-center text-label-sm text-text-soft-400">AND</div>
         <div className="rounded-2xl bg-bg-weak-50 p-4">
           <div className="text-subheading-2xs uppercase tracking-wider text-text-soft-400">Guardian B</div>
-          <div className="mt-2 flex items-center gap-2 text-label-sm text-text-strong-950">{factor.type === 'passkey' ? <RiMacbookLine className="size-5 text-primary-base" /> : <RiIdCardLine className="size-5 text-primary-base" />}{factor.label}</div>
+          <div className="mt-2 flex items-center gap-2 text-label-sm text-text-strong-950">{factor.type === 'passkey' ? <RiMacbookLine className="size-5 text-primary-base" /> : factor.type === 'dnie' ? <RiIdCardLine className="size-5 text-primary-base" /> : <RiQrCodeLine className="size-5 text-primary-base" />}{factor.label}</div>
           <div className="mt-1 text-paragraph-xs text-text-sub-600">Something only you have.</div>
         </div>
       </div>

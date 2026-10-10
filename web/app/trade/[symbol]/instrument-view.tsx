@@ -9,10 +9,11 @@ import { InstrumentLogo, PeriodControl, formatChartTime } from '@/components/mar
 import { TradeSheet } from '@/components/trade-sheet';
 import { formatNumber } from '@/lib/format';
 import {
-  FX, PERIOD_LABEL, VENUE, cancelOrder, formatPct, formatPrice, formatQty, formatSigned, instrument, prevClose, priceSeries, toggleWatch, tradable, useMarket,
+  FX, PERIOD_LABEL, VENUE, cancelOrder, formatPrice, formatQty, formatSigned, instrument, prevClose, priceDigits, priceSeries, toggleWatch, tradable, useMarket,
   type Instrument, type Period, type Point,
 } from '@/lib/market';
 import { cn } from '@/utils/cn';
+import { Num, PctNum, SignedNum } from '@/components/num';
 
 const PERIODS: Period[] = ['1D', '1W', '1M', '6M', '1Y', 'All'];
 
@@ -69,11 +70,11 @@ function Detail({ i }: { i: Instrument }) {
       <div className="min-w-0 space-y-6 lg:col-start-1">
         <section className="rounded-3xl bg-bg-white-0 p-5 shadow-regular-xs ring-1 ring-inset ring-stroke-soft-200 md:p-6">
           <div className="text-[32px] font-medium tabular-nums leading-tight tracking-[-0.01em] text-text-strong-950">
-            {fmt(shown)} <span className="text-[0.5em] text-text-soft-400">{i.currency}</span>
+            <Num value={shown} digits={priceDigits(price, i)} /> <span className="text-[0.5em] text-text-soft-400">{i.currency}</span>
           </div>
           <div className="mt-1 text-paragraph-sm text-text-sub-600">
             <span className={cn('text-label-sm tabular-nums', up ? 'text-success-base' : 'text-error-base')}>
-              {formatSigned(diff, i.kind === 'crypto' && price < 100 ? 4 : 2)} ({up ? '▲' : '▼'} {formatPct(diff / start)})
+              <SignedNum value={diff} digits={i.kind === 'crypto' && price < 100 ? 4 : 2} /> ({up ? '▲' : '▼'} <PctNum value={diff / start} />)
             </span>{' '}
             {scrub ? formatChartTime(period)(scrub.t) : PERIOD_LABEL[period]}
           </div>

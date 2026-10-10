@@ -6,7 +6,7 @@ const P256_N = 0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc63255
 
 export type Passkey = { credentialId: string; x: bigint; y: bigint };
 
-const b64url = {
+export const b64url = {
   encode(buf: ArrayBuffer | Uint8Array) {
     const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
     let s = '';
@@ -19,7 +19,7 @@ const b64url = {
   },
 };
 
-const toBig = (bytes: Uint8Array) => BigInt('0x' + Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join(''));
+export const toBig = (bytes: Uint8Array) => BigInt('0x' + Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join(''));
 
 export function passkeysSupported() {
   return typeof window !== 'undefined' && !!window.PublicKeyCredential;
@@ -54,7 +54,7 @@ export async function createPasskey(opts: { userName: string; displayName: strin
   return { credentialId: b64url.encode(cred.rawId), x: toBig(raw.slice(0, 32)), y: toBig(raw.slice(32)) };
 }
 
-function parseDer(sig: Uint8Array): { r: bigint; s: bigint } {
+export function parseDer(sig: Uint8Array): { r: bigint; s: bigint } {
   // SEQUENCE { INTEGER r, INTEGER s }
   let i = 2;
   if (sig[1] & 0x80) i += sig[1] & 0x7f;

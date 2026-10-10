@@ -172,7 +172,7 @@ function tick() {
 function subscribe(listener: () => void) {
   if (!loaded) load();
   listeners.add(listener);
-  timer ??= setInterval(tick, 2500);
+  timer ??= setInterval(tick, 5000);
   return () => {
     listeners.delete(listener);
     if (!listeners.size && timer) { clearInterval(timer); timer = undefined; }
@@ -313,9 +313,15 @@ export function recordWalletTransfer(usdc: number) {
 const fmt = (d: number) => new Intl.NumberFormat('de-CH', { minimumFractionDigits: d, maximumFractionDigits: d });
 const F2 = fmt(2), F3 = fmt(3), F4 = fmt(4);
 
+/** Decimal places a price is shown with: more for cheap crypto. */
+export function priceDigits(v: number, i?: Instrument) {
+  if (i?.kind === 'crypto') return v < 1 ? 4 : v < 100 ? 3 : 2;
+  return 2;
+}
+
 export function formatPrice(v: number, i?: Instrument) {
-  if (i?.kind === 'crypto') return (v < 1 ? F4 : v < 100 ? F3 : F2).format(v);
-  return F2.format(v);
+  const d = priceDigits(v, i);
+  return (d === 4 ? F4 : d === 3 ? F3 : F2).format(v);
 }
 
 export function formatQty(q: number) {

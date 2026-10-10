@@ -6,7 +6,6 @@ import * as Label from '@/components/ui/label';
 import * as Button from '@/components/ui/button';
 import * as Alert from '@/components/ui/alert';
 import { DEMO_CLIENT } from '@/lib/config';
-import { MockTag } from './brand';
 import { useSession } from './session';
 import { cn } from '@/utils/cn';
 
@@ -18,7 +17,6 @@ export function LoginCard({ title = 'Log in to Swissquote', subtitle, onDone }: 
           <h2 className="text-title-h6 text-text-strong-950">{title}</h2>
           {subtitle && <p className="mt-1 text-paragraph-sm text-text-sub-600">{subtitle}</p>}
         </div>
-        <MockTag>Mock login</MockTag>
       </div>
       <LoginForm onDone={onDone} />
     </div>

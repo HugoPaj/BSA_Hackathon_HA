@@ -1,0 +1,14 @@
+// Vendored sources of jmulticard (https://github.com/ctt-gob-es/jmulticard, commit 4ec9494, GPL-2.0 / EUPL-1.1),
+// the Spanish government's smart-card library: jmulticard + jmulticard-crypto + jmulticard-android.
+plugins { id 'com.android.library' }
+android {
+    namespace 'es.gob.jmulticard'
+    compileSdk 35
+    defaultConfig { minSdk 26 }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    lint { abortOnError false }
+}
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8'; options.compilerArgs << '-Xlint:none' << '-nowarn' }

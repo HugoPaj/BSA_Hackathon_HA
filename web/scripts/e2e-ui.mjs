@@ -29,7 +29,7 @@ const waitText = (text, timeout = 120000) => {
 try {
   await page.goto(BASE + '/', { waitUntil: 'networkidle2' });
   await shot('landing');
-  await clickText('Log in');
+  await (await page.waitForSelector('form button[type=submit]:not([disabled])')).click();
   await waitText('Buying power');
   // fresh demo state
   await page.evaluate(() => fetch('/api/demo/reset', { method: 'POST', body: '{}' }));
@@ -40,6 +40,7 @@ try {
   await waitText('Passkey created');
   await shot('onboarding-passkey');
   await clickText('Continue');
+  await clickText('Passkey on another device'); // the DNI is the default factor now
   await waitText('Use another device');
   await shot('onboarding-recovery');
   await clickText('Add recovery passkey');

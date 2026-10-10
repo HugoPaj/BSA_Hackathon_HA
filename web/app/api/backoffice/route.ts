@@ -2,7 +2,7 @@ import type { Hex } from 'viem';
 import { NODE_RPC, USDC } from '@/lib/config';
 import { client as rpc, erc20Abi } from '@/lib/chain';
 import { publicSession, read } from '@/lib/server/db';
-import { guardianAccount } from '@/lib/server/keys';
+import { guardianInfo, guardianLogs, guardianSafe } from '@/lib/server/guardians';
 import { opsAddress } from '@/lib/server/aa';
 import { json } from '@/lib/server/session';
 
@@ -19,5 +19,19 @@ export async function GET() {
     wallets: Object.values(db.wallets).map((w) => ({ clientId: w.clientId, address: w.address, deployed: !!w.deployedAt, owner: w.owner.signer, guardianA: w.guardianA, guardianB: { type: w.guardianB.type, address: w.guardianB.address, label: w.guardianB.label }, proof: w.proof ?? null, previousOwners: w.previousOwners.length })),
     recoveries: Object.values(db.recoveries).sort((a, b) => b.createdAt - a.createdAt).slice(0, 20).map(publicSession),
   }));
-  return json({ ...data, treasury: { address: treasury, usdc, eth }, guardian: guardianAccount().address });
+  // The guardians are separate processes: their keys and logs are theirs. We can only ask.
+  const [sq, partner, safe, logs] = await Promise.all([
+    guardianInfo('swissquote').catch(() => null),
+    guardianInfo('partner').catch(() => null),
+    guardianSafe().catch(() => null),
+    guardianLogs(),
+  ]);
+  const fromGuardian = (actor: string, entries: typeof logs.swissquote) => (entries ?? []).map((e) => ({ ...e, id: `${actor}-${e.id}`, actor }));
+  const audit = [...data.audit, ...fromGuardian('Guardian HSM (own process)', logs.swissquote), ...fromGuardian('Recovery partner', logs.partner), ...fromGuardian('Liveness vendor (own process)', logs.liveness)].sort((a, b) => b.ts - a.ts);
+  return json({
+    ...data,
+    audit,
+    treasury: { address: treasury, usdc, eth },
+    guardian: { safe: safe?.address ?? null, swissquote: sq ? { address: sq.address, online: true } : { online: false }, partner: partner ? { address: partner.address, online: true } : { online: false } },
+  });
 }

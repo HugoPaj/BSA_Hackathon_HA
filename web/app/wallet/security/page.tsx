@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import {
-  RiBankLine, RiExternalLinkLine, RiFingerprintLine, RiHistoryLine, RiIdCardLine, RiKey2Line, RiMacbookLine, RiRefreshLine,
+  RiBankLine, RiExternalLinkLine, RiFingerprintLine, RiHistoryLine, RiIdCardLine, RiKey2Line, RiQrCodeLine, RiMacbookLine, RiRefreshLine,
   RiTimeLine, RiVerifiedBadgeFill, RiDeleteBinLine, RiSkull2Line,
 } from '@remixicon/react';
 import * as Badge from '@/components/ui/badge';
@@ -25,13 +25,16 @@ import { shortAddress, timeAgo } from '@/lib/format';
 import { EXPLORER, RECOVERY_DELAY_LABEL, RECOVERY_DELAY_PRODUCTION, RECOVERY_MODULE } from '@/lib/config';
 import { useSession } from '@/components/session';
 
+/** The partner hosts the rescue page on the same hostname (the passkeys' RP ID), on its own port in the demo. */
+const rescueUrl = (wallet: string) => typeof window === 'undefined' ? '#' : `${process.env.NEXT_PUBLIC_RESCUE_URL ?? `${window.location.protocol}//${window.location.hostname}:4200`}/?wallet=${wallet}`;
+
 export default function SecurityPage() {
   return <RequireLogin><Security /></RequireLogin>;
 }
 
 function Section({ title, children, id, right }: { title: string; children: React.ReactNode; id?: string; right?: React.ReactNode }) {
   return (
-    <section id={id} className="min-w-0 scroll-mt-24 rounded-3xl bg-bg-white-0 p-5 ring-1 ring-inset ring-stroke-soft-200 md:p-6">
+    <section id={id} className="min-w-0 scroll-mt-6 rounded-3xl bg-bg-white-0 p-5 ring-1 ring-inset ring-stroke-soft-200 md:p-6">
       <div className="mb-4 flex items-center justify-between gap-3"><h2 className="text-subheading-xs uppercase tracking-wider text-text-sub-600">{title}</h2>{right}</div>
       {children}
     </section>
@@ -104,7 +107,7 @@ function SecurityInner({ data, refresh }: { data: WalletData; refresh: () => voi
           <div className="space-y-2">
             {state.guardians.map((g) => {
               const l = label(g);
-              const Icon = l.type === 'swissquote' ? RiBankLine : l.type === 'passkey' ? RiMacbookLine : l.type === 'card' ? RiIdCardLine : RiKey2Line;
+              const Icon = l.type === 'swissquote' ? RiBankLine : l.type === 'passkey' ? RiMacbookLine : l.type === 'card' ? RiQrCodeLine : l.type === 'dnie' ? RiIdCardLine : RiKey2Line;
               return (
                 <div key={g} className="flex items-center gap-3 rounded-xl bg-bg-weak-50 px-3 py-2.5">
                   <Icon className="size-5 shrink-0 text-text-sub-600" />
@@ -119,8 +122,12 @@ function SecurityInner({ data, refresh }: { data: WalletData; refresh: () => voi
             <div className="rounded-xl p-3 ring-1 ring-inset ring-stroke-soft-200"><div className="flex items-center gap-1 text-text-soft-400"><RiTimeLine className="size-3.5" />Safety delay</div><div className="text-label-md text-text-strong-950">{RECOVERY_DELAY_LABEL}</div><div className="text-text-soft-400">{RECOVERY_DELAY_PRODUCTION} in production</div></div>
           </div>
           <div className="mt-4 flex items-start justify-between gap-4 rounded-xl p-3 ring-1 ring-inset ring-stroke-soft-200">
-            <div><div className="text-label-sm text-text-strong-950">Bank-assisted recovery</div><div className="text-paragraph-xs text-text-sub-600">{wallet.bankAssisted ? 'Swissquote is Guardian A. To opt out, your passkey swaps it for a trusted contact (guardian rotation, production feature).' : 'Off: a trusted contact is Guardian A.'}</div></div>
+            <div><div className="text-label-sm text-text-strong-950">Bank-assisted recovery</div><div className="text-paragraph-xs text-text-sub-600">{wallet.bankAssisted ? 'Guardian A is a 1-of-2 Safe: Swissquote or an independent partner can approve, never both as two votes. To opt out, your passkey swaps it for a trusted contact (guardian rotation, production feature).' : 'Off: a trusted contact is Guardian A.'}</div></div>
             <Badge.Root color={wallet.bankAssisted ? 'green' : 'gray'} variant="lighter" className="shrink-0">{wallet.bankAssisted ? 'On' : 'Off'}</Badge.Root>
+          </div>
+          <div className="mt-2 flex items-start justify-between gap-4 rounded-xl p-3 ring-1 ring-inset ring-stroke-soft-200">
+            <div><div className="text-label-sm text-text-strong-950">If Swissquote disappears</div><div className="text-paragraph-xs text-text-sub-600">The independent partner&apos;s rescue page works without any Swissquote server: send your funds out with your passkey, or recover with your {wallet.guardianB.type === 'card' ? 'recovery card' : 'recovery passkey'} and the partner. Keep your wallet address somewhere safe.</div></div>
+            <a className="flex shrink-0 items-center gap-1 text-label-xs text-primary-base hover:underline" target="_blank" href={rescueUrl(wallet.address)}>Rescue page <RiExternalLinkLine className="size-3.5" /></a>
           </div>
         </Section>
       </div>

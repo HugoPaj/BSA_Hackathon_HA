@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import type { MetaTransaction } from 'abstractionkit';
 import {
@@ -12,6 +12,8 @@ import * as Alert from '@/components/ui/alert';
 import { Sheet } from './sheet';
 import { ChecksList } from './checks';
 import { CardUnlock } from './card-unlock';
+import { DnieSign } from './dnie-sign';
+import { factorName, type GuardianB } from '@/lib/chain';
 import type { useTxFlow, CardSigner } from '@/lib/use-tx-flow';
 import { formatUsdc } from '@/lib/format';
 import { CHAIN_NAME, EXPLORER } from '@/lib/config';
@@ -25,12 +27,14 @@ export function TxSheet({ open, onOpenChange, flow, title, headline, txs, guardi
   title: string;
   headline?: React.ReactNode;
   txs: MetaTransaction[];
-  guardianType: 'passkey' | 'card';
+  guardianType: GuardianB['type'];
   onDone?: () => void;
   confirmLabel?: string;
 }) {
   const { phase, evaluation, error, txHash } = flow;
   const [card, setCard] = useState<CardSigner | null>(null);
+  const [dnieStepUp, setDnieStepUp] = useState<string | null>(null);
+  const pendingStepUp = useRef<string | null>(null);
   const busy = ['preparing', 'stepup', 'signing', 'submitting', 'confirming'].includes(phase);
   const stepUp = evaluation?.decision === 'step-up';
   const total = evaluation ? evaluation.outgoing + evaluation.fee : 0n;
@@ -101,17 +105,20 @@ export function TxSheet({ open, onOpenChange, flow, title, headline, txs, guardi
           {stepUp && phase === 'review' && guardianType === 'card' && (card
             ? <Alert.Root status="success" variant="lighter" size="small"><Alert.Icon />Recovery card unlocked. It co-signs when you confirm.</Alert.Root>
             : <CardUnlock onUnlocked={setCard} purpose="Confirm this high-value transfer" />)}
+          {stepUp && phase === 'review' && guardianType === 'dnie' && (dnieStepUp
+            ? <Alert.Root status="success" variant="lighter" size="small"><Alert.Icon />Your DNI confirmed this transaction. Your passkey signs next.</Alert.Root>
+            : <DnieSign create={async () => { const r = await flow.dnieStepUp(); pendingStepUp.current = r.stepUpId; return r.request; }} onDone={() => setDnieStepUp(pendingStepUp.current)} />)}
 
           <StatusLine phase={phase} stepUp={stepUp} guardianType={guardianType} />
 
           {phase === 'review' && (
             <div className="space-y-2">
-              <FancyButton.Root variant="primary" className="h-12 w-full" disabled={stepUp && guardianType === 'card' && !card} onClick={() => flow.confirm(card ?? undefined)}>
+              <FancyButton.Root variant="primary" className="h-12 w-full" disabled={stepUp && ((guardianType === 'card' && !card) || (guardianType === 'dnie' && !dnieStepUp))} onClick={() => flow.confirm(card ?? undefined, dnieStepUp ?? undefined)}>
                 <FancyButton.Icon as={RiFingerprintLine} />
-                {stepUp ? (guardianType === 'passkey' ? 'Confirm with both devices' : 'Confirm with card and passkey') : confirmLabel}
+                {stepUp ? (guardianType === 'passkey' ? 'Confirm with both devices' : guardianType === 'dnie' ? 'Sign with passkey' : 'Confirm with card and passkey') : confirmLabel}
               </FancyButton.Root>
               <p className="text-center text-paragraph-xs text-text-soft-400">
-                {stepUp ? `High-value: your ${guardianType === 'passkey' ? 'recovery device' : 'recovery card'} confirms first, then your passkey signs.` : 'Face ID, Touch ID, Windows Hello or your device PIN.'}
+                {stepUp ? `High-value: your ${factorName(guardianType)} confirms first, then your passkey signs.` : 'Face ID, Touch ID, Windows Hello or your device PIN.'}
               </p>
             </div>
           )}
@@ -132,7 +139,7 @@ export function TxSheet({ open, onOpenChange, flow, title, headline, txs, guardi
 function StatusLine({ phase, stepUp, guardianType }: { phase: string; stepUp: boolean; guardianType: string }) {
   const text: Record<string, string> = {
     preparing: 'Swissquote is checking this transaction…',
-    stepup: `Confirm on your ${guardianType === 'passkey' ? 'recovery device (choose “use another device” if asked)' : 'recovery card'}…`,
+    stepup: guardianType === 'dnie' ? 'Checking your DNI confirmation…' : `Confirm on your ${guardianType === 'passkey' ? 'recovery device (choose “use another device” if asked)' : 'recovery card'}…`,
     signing: 'Approve with your passkey…',
     submitting: 'Sending to the network…',
     confirming: `Waiting for ${CHAIN_NAME} to confirm…`,

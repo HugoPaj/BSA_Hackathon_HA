@@ -1,19 +1,14 @@
 import 'server-only';
-// Recovery orchestration. Swissquote's guardian key (HSM in production) signs an EIP-712 approval
-// only for a complete, structured request, after e-banking login and a liveness match. It never signs transactions.
-import { hashTypedData, isAddressEqual, recoverTypedDataAddress, type Hex } from 'viem';
-import { CHAIN_ID, NODE_RPC, RECOVERY_DELAY_LABEL } from '../config';
-import { isValid1271, passkeySignerAddress, readWalletState, Safe, srm, type PublicKey, type WalletState } from '../chain';
+// Recovery orchestration. This backend holds no guardian key: Swissquote's guardian runs as a separate service
+// (services/guardian.ts) that re-checks every request on-chain and signs an EIP-712 approval only for a complete,
+// structured request, after e-banking login and a vendor-signed liveness match. It never signs transactions.
+import { isAddressEqual, recoverTypedDataAddress, type Hex } from 'viem';
+import { NODE_RPC, RECOVERY_DELAY_LABEL } from '../config';
+import { isValid1271, passkeySignerAddress, readWalletState, recoveryRequest, Safe, srm, type PublicKey, type WalletState } from '../chain';
 import { addActivity, alert, audit, id, read, write, type RecoverySession, type WalletRecord } from './db';
-import { guardianAccount } from './keys';
+import { guardianSafe, livenessVendor, requestSwissquoteApproval } from './guardians';
+import { checkAttestation, type LivenessAttestation } from '../liveness';
 import { relay } from './aa';
-
-const PRIMARY = 'ExecuteRecovery' as const;
-
-export async function typedData(wallet: string, newOwnerSigner: string, nonce: bigint) {
-  const ed = await srm.getRecoveryRequestEip712Data(NODE_RPC, CHAIN_ID, wallet, [newOwnerSigner], 1n, { recoveryNonce: nonce });
-  return { domain: ed.domain, types: ed.types, primaryType: PRIMARY, message: ed.messageValue } as const;
-}
 
 export async function startRecovery(wallet: WalletRecord, newOwner: PublicKey & { credentialId: string }) {
   if (!wallet.bankAssisted) throw new Error('This wallet does not use bank-assisted recovery. Ask your trusted contact to approve instead.');
@@ -23,8 +18,7 @@ export async function startRecovery(wallet: WalletRecord, newOwner: PublicKey & 
   const signer = passkeySignerAddress(newOwner);
   if (state.owners.some((o) => isAddressEqual(o as Hex, signer))) throw new Error('This passkey already owns the wallet');
   const nonce = await srm.nonce(NODE_RPC, wallet.address);
-  const td = await typedData(wallet.address, signer, nonce);
-  const hash = hashTypedData(td as Parameters<typeof hashTypedData>[0]);
+  const { hash } = await recoveryRequest(NODE_RPC, wallet.address, signer, nonce);
   const session: RecoverySession = {
     id: id(), clientId: wallet.clientId, wallet: wallet.address, newOwner: { ...newOwner, signer }, hash, nonce: nonce.toString(), createdAt: Date.now(), status: 'collecting',
   };
@@ -44,9 +38,9 @@ export async function approveGuardianB(session: RecoverySession, wallet: WalletR
   if (session.status !== 'collecting') throw new Error('This recovery request is closed');
   const gB = wallet.guardianB;
   const verify = async () => {
-    if (gB.type === 'passkey') return isValid1271(NODE_RPC, gB.address, session.hash as Hex, signature);
-    const td = await typedData(session.wallet, session.newOwner.signer, BigInt(session.nonce));
-    const addr = await recoverTypedDataAddress({ ...(td as Parameters<typeof hashTypedData>[0]), signature }).catch(() => null);
+    if (gB.type === 'passkey' || gB.type === 'dnie') return isValid1271(NODE_RPC, gB.address, session.hash as Hex, signature);
+    const { typedData } = await recoveryRequest(NODE_RPC, session.wallet, session.newOwner.signer, BigInt(session.nonce));
+    const addr = await recoverTypedDataAddress({ ...typedData, signature }).catch(() => null);
     return !!addr && isAddressEqual(addr, gB.address as Hex);
   };
   const ok = (await isOnChainGuardian(wallet.address, gB.address)) && (await verify());
@@ -60,30 +54,52 @@ export async function approveGuardianB(session: RecoverySession, wallet: WalletR
   return maybeSubmit(session.id);
 }
 
-/** Mocked liveness check against the KYC file, then the HSM policy. */
-export async function liveness(session: RecoverySession, wallet: WalletRecord, result: 'match' | 'mismatch') {
+/**
+ * The liveness vendor's signed verdict, relayed by the client's browser. We check it so we can explain a refusal
+ * and alert the owner, but our check grants nothing: the guardian verifies the same attestation independently.
+ */
+export async function liveness(session: RecoverySession, wallet: WalletRecord, attestation: LivenessAttestation) {
   if (session.status !== 'collecting') throw new Error('This recovery request is closed');
-  write((db) => { db.recoveries[session.id].liveness = { result, at: Date.now() }; });
+  const problem = await checkAttestation(attestation, { vendor: await livenessVendor(), wallet: wallet.address, request: session.hash, subject: wallet.clientId });
+  if (problem) {
+    audit({ actor: 'Recovery service', action: 'Liveness attestation rejected', wallet: wallet.address, detail: problem, outcome: 'declined' });
+    throw new Error(`${problem}. Run the face check again.`);
+  }
+  const result = attestation.match ? 'match' : 'mismatch';
+  write((db) => { db.recoveries[session.id].liveness = { result, at: Date.now(), attestation }; });
   if (result === 'mismatch') {
     write((db) => { db.recoveries[session.id].status = 'refused'; });
-    audit({ actor: 'KYC liveness (mock)', action: 'Face match failed', wallet: wallet.address, detail: 'Live selfie does not match the KYC file', outcome: 'declined' });
-    audit({ actor: 'Guardian HSM', action: 'Refused to sign', wallet: wallet.address, detail: 'Policy: liveness match required', outcome: 'declined' });
+    audit({ actor: 'KYC liveness vendor', action: 'Face match failed', wallet: wallet.address, detail: 'Signed verdict: the live selfie does not match the KYC file', outcome: 'declined' });
+    audit({ actor: 'Recovery service', action: 'Not sent to the guardian', wallet: wallet.address, detail: 'Swissquote\'s guardian signs only after a liveness match', outcome: 'declined' });
     alert(wallet.address, { severity: 'error', title: 'Recovery attempt blocked', body: 'A recovery attempt failed the face check against your ID. Swissquote refused to approve it. Your wallet is safe.' });
     throw new Error('The face check did not match the ID on file. Swissquote will not approve this recovery.');
   }
   const pending = read((db) => Object.values(db.recoveries).some((r) => r.wallet === wallet.address && r.id !== session.id && r.status === 'pending'));
   if (pending) throw new Error('HSM policy: another recovery is already pending for this wallet');
-  audit({ actor: 'KYC liveness (mock)', action: 'Face match passed', wallet: wallet.address, detail: 'Live selfie matches the KYC file', outcome: 'approved' });
+  audit({ actor: 'KYC liveness vendor', action: 'Face match passed', wallet: wallet.address, detail: `Signed verdict for client ${attestation.subject}, bound to this recovery request`, outcome: 'approved' });
   return maybeSubmit(session.id);
 }
 
-/** HSM policy: sign only an open request with a verified Guardian B and a passed liveness check. */
+/** Once the request is complete, hand the evidence to the guardian service. It verifies all of it itself before signing. */
 async function hsmSign(s: RecoverySession) {
-  if (s.swissquote || s.status !== 'collecting' || !s.guardianB || s.liveness?.result !== 'match') return;
-  const td = await typedData(s.wallet, s.newOwner.signer, BigInt(s.nonce));
-  const signature = await guardianAccount().signTypedData(td as Parameters<ReturnType<typeof guardianAccount>['signTypedData']>[0]);
-  write((db) => { db.recoveries[s.id].swissquote = { signature, signedAt: Date.now() }; });
-  audit({ actor: 'Guardian HSM', action: 'Signed recovery approval', wallet: s.wallet, detail: `Four-eyes: recovery factor verified, liveness passed, operator 2 approved. Structured request: owner → ${s.newOwner.signer}, threshold 1`, outcome: 'approved' });
+  if (s.swissquote || s.status !== 'collecting' || !s.guardianB || s.liveness?.result !== 'match' || !s.liveness.attestation) return;
+  const wallet = read((db) => db.wallets[s.clientId]);
+  try {
+    // The guardian learns whose KYC file this wallet belongs to from the owner's own passkey signature, not from us.
+    if (!wallet.proof?.signature) throw new Error('Swissquote\'s guardian needs the wallet ownership proof your passkey signed when you opened the wallet. Without it, recover with the independent partner instead.');
+    await guardianSafe(); // normally deployed long before; this only covers a fresh demo setup
+    const { signature } = await requestSwissquoteApproval({
+      wallet: s.wallet, guardian: wallet.guardianA.address, newOwner: s.newOwner.signer, guardianBSignature: s.guardianB.signature,
+      attestation: s.liveness.attestation, ownershipProof: { message: wallet.proof.message, signature: wallet.proof.signature },
+    });
+    write((db) => { db.recoveries[s.id].swissquote = { signature, signedAt: Date.now() }; });
+    audit({ actor: 'Guardian HSM', action: 'Signed recovery approval', wallet: s.wallet, detail: `Separate guardian service verified on its own: the recovery factor on-chain, the vendor-signed liveness verdict for this request, and the owner-signed ownership proof. Structured request: owner → ${s.newOwner.signer}, threshold 1`, outcome: 'approved' });
+  } catch (e) {
+    audit({ actor: 'Guardian HSM', action: 'Refused to sign', wallet: s.wallet, detail: (e as Error).message, outcome: 'declined' });
+    // A stale verdict (older than its TTL, or already used) can be replaced by a fresh face check.
+    if (/attestation (expired|was already used)/.test((e as Error).message)) write((db) => { delete db.recoveries[s.id].liveness; });
+    throw e;
+  }
 }
 
 async function maybeSubmit(sessionId: string) {
