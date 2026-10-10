@@ -4,6 +4,7 @@ import { RiCheckboxCircleFill, RiCloseCircleFill, RiErrorWarningFill, RiInformat
 import * as Badge from '@/components/ui/badge';
 import { RequireLogin } from '@/components/require-login';
 import { PageTitle } from '@/components/page-title';
+import { Bone, BoneLines, Skeleton } from '@/components/skeleton';
 import { useAlerts } from '@/lib/hooks';
 import { api } from '@/lib/api';
 import { timeAgo } from '@/lib/format';
@@ -30,7 +31,16 @@ function Inbox() {
     <div className="mx-auto max-w-[720px]">
       <PageTitle title="E-banking inbox" subtitle="Security alerts about your wallet. Each one also goes out by push and e-mail, so a thief who controls one channel cannot hide them." />
       <div className="overflow-hidden rounded-3xl bg-bg-white-0 ring-1 ring-stroke-soft-200">
-        {!data?.length && <div className="flex flex-col items-center gap-2 p-10 text-paragraph-sm text-text-soft-400"><RiMailLine className="size-8" />No messages yet.</div>}
+        {data === undefined ? (
+          <Skeleton className="divide-y divide-stroke-soft-200">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="flex gap-3 p-4 md:p-5">
+                <Bone className="mt-0.5 size-5 shrink-0 rounded-full" />
+                <div className="flex-1 space-y-2"><Bone className="h-4 w-1/3" /><BoneLines /></div>
+              </div>
+            ))}
+          </Skeleton>
+        ) : !data.length && <div className="flex flex-col items-center gap-2 p-10 text-paragraph-sm text-text-soft-400"><RiMailLine className="size-8" />No messages yet.</div>}
         <div className="divide-y divide-stroke-soft-200">
           {data?.map((a) => {
             const S = SEV[a.severity];

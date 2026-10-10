@@ -1,12 +1,14 @@
 'use client';
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import type { Client } from '@/lib/hooks';
+import { clearPollCache, type Client } from '@/lib/hooks';
 
 type SessionValue = {
   client: Client | null;
   wallet: { address: string; deployed: boolean } | null;
   ready: boolean;
+  /** Best guess before the session request returns (the server saw a session cookie), the real answer after. */
+  signedIn: boolean;
   refresh: () => Promise<void>;
   login: (clientId: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -14,7 +16,7 @@ type SessionValue = {
 
 const Ctx = createContext<SessionValue | null>(null);
 
-export function SessionProvider({ children }: { children: React.ReactNode }) {
+export function SessionProvider({ children, hasCookie = false }: { children: React.ReactNode; hasCookie?: boolean }) {
   const [client, setClient] = useState<Client | null>(null);
   const [wallet, setWallet] = useState<SessionValue['wallet']>(null);
   const [ready, setReady] = useState(false);
@@ -28,13 +30,16 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { refresh(); }, [refresh]);
   const login = useCallback(async (clientId: string, password: string) => {
     await api('/api/session', { clientId, password });
+    clearPollCache();
     await refresh();
   }, [refresh]);
   const logout = useCallback(async () => {
     await api('/api/session', undefined, 'DELETE');
+    clearPollCache();
     await refresh();
   }, [refresh]);
-  return <Ctx.Provider value={{ client, wallet, ready, refresh, login, logout }}>{children}</Ctx.Provider>;
+  const signedIn = ready ? !!client : hasCookie;
+  return <Ctx.Provider value={{ client, wallet, ready, signedIn, refresh, login, logout }}>{children}</Ctx.Provider>;
 }
 
 export function useSession() {

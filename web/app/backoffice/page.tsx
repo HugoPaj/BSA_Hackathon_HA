@@ -19,7 +19,7 @@ type BO = {
 const A = ({ a }: { a: string }) => <a className="inline-flex items-center gap-0.5 font-mono text-paragraph-xs text-primary-base hover:underline" target="_blank" href={`${EXPLORER}/address/${a}`}>{shortAddress(a)}<RiExternalLinkLine className="size-3" /></a>;
 
 export default function Backoffice() {
-  const { data } = usePoll(() => api<BO>('/api/backoffice'), 5000);
+  const { data } = usePoll('/api/backoffice', () => api<BO>('/api/backoffice'), 5000);
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">

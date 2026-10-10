@@ -4,6 +4,7 @@ import { RiArrowDownSLine, RiLogoutBoxRLine, RiShieldUserLine } from '@remixicon
 import * as Avatar from '@/components/ui/avatar';
 import * as Dropdown from '@/components/ui/dropdown';
 import { useSession } from './session';
+import { Bone } from './skeleton';
 
 function initials(name: string) {
   return name.split(/\s+/).map((w) => w[0]).slice(0, 2).join('');
@@ -11,8 +12,8 @@ function initials(name: string) {
 
 /** Account menu in the AlignUI pattern: Avatar trigger + Dropdown. Account-level pages live here; money destinations live in the nav bars. */
 export function AccountMenu() {
-  const { client, logout } = useSession();
-  if (!client) return null;
+  const { client, signedIn, logout } = useSession();
+  if (!client) return signedIn ? <Bone className="m-0.5 size-8 rounded-full" /> : null;
   const avatar = (size: '32' | '40') => (
     <Avatar.Root size={size} className="bg-primary-alpha-10 text-primary-dark">{initials(client.name)}</Avatar.Root>
   );

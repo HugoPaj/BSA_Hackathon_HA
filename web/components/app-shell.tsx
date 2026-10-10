@@ -19,8 +19,8 @@ const NAV = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { client } = useSession();
-  const { data: alerts } = useAlerts(5000, !!client);
+  const { signedIn } = useSession();
+  const { data: alerts } = useAlerts(5000, signedIn);
   const unread = (alerts ?? []).filter((a) => !a.read).length;
   const bare = pathname.startsWith('/backoffice');
 
@@ -29,7 +29,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <header className="sticky top-0 z-40 border-b border-stroke-soft-200 bg-bg-white-0/90 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-[1220px] items-center gap-6 px-4 lg:px-8">
           <Link href="/" className="flex shrink-0 items-center"><SqLogo product={bare ? 'Operations' : undefined} /></Link>
-          {!bare && client && (
+          {!bare && signedIn && (
             <nav className="hidden flex-1 items-center gap-1 md:flex">
               {NAV.map((n) => {
                 const on = n.match(pathname);
@@ -42,15 +42,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </nav>
           )}
           <div className="ml-auto flex items-center gap-2">
-            {!bare && client && <InboxBell on={pathname.startsWith('/inbox')} unread={unread} />}
+            {!bare && signedIn && <InboxBell on={pathname.startsWith('/inbox')} unread={unread} />}
             {!bare && <AccountMenu />}
           </div>
         </div>
       </header>
 
-      <main className={cn('mx-auto w-full max-w-[1220px] flex-1 px-4 pt-6 lg:px-8 lg:pt-10', client && !bare ? 'pb-28 md:pb-16' : 'pb-16')}>{children}</main>
+      <main className={cn('mx-auto w-full max-w-[1220px] flex-1 px-4 pt-6 lg:px-8 lg:pt-10', signedIn && !bare ? 'pb-28 md:pb-16' : 'pb-16')}>{children}</main>
 
-      {client && !bare && (
+      {signedIn && !bare && (
         <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-stroke-soft-200 bg-bg-white-0/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden">
           <div className="grid grid-cols-4">
             {NAV.map((n) => {

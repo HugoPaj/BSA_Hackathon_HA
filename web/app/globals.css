@@ -880,5 +880,7 @@ body {
 .stagger > :nth-child(2) { animation-delay: 50ms; }
 .stagger > :nth-child(3) { animation-delay: 100ms; }
 .stagger > :nth-child(n + 4) { animation-delay: 150ms; }
+/* Skeletons wait 150ms before showing, so quick loads never flash one. */
+.animate-skeleton-in { animation: fade-in 200ms ease-out 150ms both; }
 /* Reduced motion keeps the fade, drops the movement. */
 @media (prefers-reduced-motion: reduce) { .animate-fade-in-up { animation-name: fade-in; animation-duration: 200ms; } }

@@ -5,6 +5,7 @@ import type { Activity } from '@/lib/server/db';
 import { EXPLORER } from '@/lib/config';
 import { formatUsdc, timeAgo } from '@/lib/format';
 import { cn } from '@/utils/cn';
+import { BoneRow, Skeleton } from './skeleton';
 
 const ICONS = {
   send: { icon: RiArrowRightUpLine, cls: 'bg-bg-weak-50 text-text-sub-600' },
@@ -16,7 +17,7 @@ const ICONS = {
 };
 
 export function ActivityList({ items, empty = 'No activity yet.' }: { items?: Activity[]; empty?: string }) {
-  if (!items) return <div className="space-y-2">{[0, 1, 2].map((i) => <div key={i} className="h-14 animate-pulse rounded-xl bg-bg-weak-50" />)}</div>;
+  if (!items) return <Skeleton className="divide-y divide-stroke-soft-200">{[0, 1, 2].map((i) => <BoneRow key={i} className="py-3" />)}</Skeleton>;
   if (!items.length) return <div className="rounded-xl bg-bg-weak-50 px-4 py-6 text-center text-paragraph-sm text-text-soft-400">{empty}</div>;
   return (
     <div className="divide-y divide-stroke-soft-200">

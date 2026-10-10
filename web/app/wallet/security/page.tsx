@@ -13,6 +13,8 @@ import { RequireLogin } from '@/components/require-login';
 import { PageTitle } from '@/components/page-title';
 import { RecoveryBanner } from '@/components/recovery-banner';
 import { TxSheet } from '@/components/tx-sheet';
+import { NoWallet } from '@/components/no-wallet';
+import { Bone, BoneCard, BoneLines, Skeleton } from '@/components/skeleton';
 import { useWallet, type WalletData } from '@/lib/hooks';
 import { useTxFlow, friendly } from '@/lib/use-tx-flow';
 import { api } from '@/lib/api';
@@ -36,10 +38,36 @@ function Section({ title, children, id, right }: { title: string; children: Reac
   );
 }
 
+const title = <PageTitle title="Security" subtitle="Everything below is read live from the chain. Only your passkey can change it." back="/wallet" />;
+
 function Security() {
-  const { data, refresh } = useWallet();
-  if (!data?.wallet || !data.state?.deployed) return <div className="mx-auto max-w-[480px] text-center text-paragraph-sm text-text-sub-600">No wallet yet. <Link className="text-primary-base" href="/wallet/new">Open one</Link>.</div>;
+  const { data, refresh, loading } = useWallet();
+  if (loading && !data) return <SecuritySkeleton />;
+  if (!data?.wallet || !data.state?.deployed) return <NoWallet started={!!data?.wallet} />;
   return <SecurityInner data={data} refresh={refresh} />;
+}
+
+function SecuritySkeleton() {
+  return (
+    <div className="mx-auto max-w-[860px] space-y-5">
+      {title}
+      <Skeleton className="space-y-5">
+        <div className="grid gap-5 md:grid-cols-2">
+          <BoneCard>
+            <Bone className="mb-4 h-3.5 w-40" />
+            <div className="flex items-center gap-3"><Bone className="size-11 rounded-xl" /><div className="flex-1 space-y-1.5"><Bone className="h-4 w-28" /><Bone className="h-3 w-44" /></div></div>
+            <BoneLines className="mt-4" />
+          </BoneCard>
+          <BoneCard>
+            <Bone className="mb-4 h-3.5 w-40" />
+            <div className="space-y-2"><Bone className="h-[60px] w-full rounded-xl" /><Bone className="h-[60px] w-full rounded-xl" /></div>
+            <div className="mt-3 grid grid-cols-2 gap-2"><Bone className="h-20 rounded-xl" /><Bone className="h-20 rounded-xl" /></div>
+          </BoneCard>
+        </div>
+        <BoneCard><Bone className="mb-4 h-3.5 w-64" /><BoneLines lines={3} /><Bone className="mt-4 h-8 w-36 rounded-lg" /></BoneCard>
+      </Skeleton>
+    </div>
+  );
 }
 
 function SecurityInner({ data, refresh }: { data: WalletData; refresh: () => void }) {
@@ -49,7 +77,7 @@ function SecurityInner({ data, refresh }: { data: WalletData; refresh: () => voi
 
   return (
     <div className="mx-auto max-w-[860px] space-y-5">
-      <PageTitle title="Security" subtitle="Everything below is read live from the chain. Only your passkey can change it." back="/wallet" />
+      {title}
       {state.recovery && <RecoveryBanner data={data} onChange={refresh} />}
 
       <div className="grid gap-5 md:grid-cols-2">

@@ -6,6 +6,10 @@ import { cn } from '@/utils/cn';
 // Swissquote's app draws every chart in blue with a soft fill, whatever the direction.
 const BLUE = '#3B82F6';
 
+// Path coordinates rounded to 0.01: far below a pixel, and identical on the server and in the browser, whose
+// Math functions can differ in the last digits (that broke hydration of server-rendered sparklines).
+const r = (n: number) => Math.round(n * 100) / 100;
+
 /** Monotone cubic interpolation: smooth, and never overshoots between points. */
 function smoothPath(xs: number[], ys: number[]) {
   const n = xs.length;
@@ -20,16 +24,16 @@ function smoothPath(xs: number[], ys: number[]) {
     t.push(m[i - 1] * m[i] <= 0 ? 0 : (3 * (dx[i - 1] + dx[i])) / ((2 * dx[i] + dx[i - 1]) / m[i - 1] + (dx[i] + 2 * dx[i - 1]) / m[i]));
   }
   t.push(m[n - 2]);
-  let d = `M${xs[0]},${ys[0]}`;
+  let d = `M${r(xs[0])},${r(ys[0])}`;
   for (let i = 0; i < n - 1; i++) {
     const h = dx[i] / 3;
-    d += `C${xs[i] + h},${ys[i] + t[i] * h},${xs[i + 1] - h},${ys[i + 1] - t[i + 1] * h},${xs[i + 1]},${ys[i + 1]}`;
+    d += `C${r(xs[i] + h)},${r(ys[i] + t[i] * h)},${r(xs[i + 1] - h)},${r(ys[i + 1] - t[i + 1] * h)},${r(xs[i + 1])},${r(ys[i + 1])}`;
   }
   return d;
 }
 
 function linearPath(xs: number[], ys: number[]) {
-  return xs.map((x, i) => `${i ? 'L' : 'M'}${x},${ys[i]}`).join('');
+  return xs.map((x, i) => `${i ? 'L' : 'M'}${r(x)},${r(ys[i])}`).join('');
 }
 
 function geometry(data: Point[], w: number, h: number, padTop: number, padBottom: number, extra: number[] = []) {
@@ -108,7 +112,7 @@ export function AreaChart({ data, height = 200, fill, curve = 'smooth', baseline
               <circle cx={g.xs[hover!]} cy={g.ys[hover!]} r={5} fill={BLUE} stroke="#fff" strokeWidth={2} />
             </g>
           )}
-          {!hp && <circle cx={g.xs[g.xs.length - 1]} cy={g.ys[g.ys.length - 1]} r={3.5} fill={BLUE} />}
+          {!hp && <circle cx={r(g.xs[g.xs.length - 1])} cy={r(g.ys[g.ys.length - 1])} r={3.5} fill={BLUE} />}
         </svg>
       )}
       {hp && (formatTime || formatValue) && (

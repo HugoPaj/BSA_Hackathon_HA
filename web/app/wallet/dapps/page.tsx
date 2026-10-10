@@ -7,6 +7,8 @@ import * as Button from '@/components/ui/button';
 import { RequireLogin } from '@/components/require-login';
 import { PageTitle } from '@/components/page-title';
 import { TxSheet } from '@/components/tx-sheet';
+import { NoWallet } from '@/components/no-wallet';
+import { Bone, BoneCard, BoneLines, Skeleton } from '@/components/skeleton';
 import { useWallet } from '@/lib/hooks';
 import { useConfig } from '@/lib/use-config';
 import { useTxFlow } from '@/lib/use-tx-flow';
@@ -23,10 +25,13 @@ export default function DappsPage() {
 
 type Action = { id: string; site?: string; title: string; description: string; txs: MetaTransaction[]; meta: { title: string } };
 
+const title = <PageTitle title="dApps" subtitle="Connect to on-chain apps with Swissquote's protection. Every request is checked before Swissquote agrees to pay the gas." back="/wallet" />;
+
 function Dapps() {
-  const { data, refresh } = useWallet(10000);
+  const { data, refresh, loading } = useWallet(10000);
   const cfg = useConfig();
-  if (!data?.wallet || !cfg) return <div className="mx-auto h-64 max-w-[860px] animate-pulse rounded-3xl bg-bg-white-0" />;
+  if ((loading && !data) || (data?.wallet && !cfg)) return <DappsSkeleton />;
+  if (!data?.wallet || !data.state?.deployed || !cfg) return <NoWallet started={!!data?.wallet} />;
   return <DappsInner data={data as Required<typeof data>} treasury={cfg.treasury} refresh={refresh} />;
 }
 
@@ -57,20 +62,8 @@ function DappsInner({ data, treasury, refresh }: { data: Required<NonNullable<Re
 
   return (
     <div className="mx-auto max-w-[860px]">
-      <PageTitle title="dApps" subtitle="Connect to on-chain apps with Swissquote's protection. Every request is checked before Swissquote agrees to pay the gas." back="/wallet" />
-      <div className="mb-6 grid gap-3 sm:grid-cols-4">
-        {[
-          { icon: RiShieldCheckLine, t: 'Allowlist', d: 'Known contracts only' },
-          { icon: RiFlaskLine, t: 'Simulation', d: 'Exact balance changes' },
-          { icon: RiSearchEyeLine, t: 'Sanctions screen', d: 'Every counterparty' },
-          { icon: RiShieldKeyholeLine, t: 'High-value step-up', d: `Above ${formatUsdc(STEP_UP_THRESHOLD)} USDC or unlimited` },
-        ].map((s) => (
-          <div key={s.t} className="flex items-center gap-3 rounded-2xl bg-bg-white-0 p-3 ring-1 ring-inset ring-stroke-soft-200">
-            <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary-alpha-10 text-primary-base"><s.icon className="size-5" /></span>
-            <div><div className="text-label-sm text-text-strong-950">{s.t}</div><div className="text-paragraph-xs text-text-sub-600">{s.d}</div></div>
-          </div>
-        ))}
-      </div>
+      {title}
+      <ProtectionTiles />
       <div className="grid gap-4 md:grid-cols-2">
         {dapps.map((d) => (
           <div key={d.name} className="flex flex-col rounded-3xl bg-bg-white-0 p-5 ring-1 ring-inset ring-stroke-soft-200">
@@ -102,6 +95,46 @@ function DappsInner({ data, treasury, refresh }: { data: Required<NonNullable<Re
           headline={<div className="rounded-xl bg-bg-weak-50 p-3 text-paragraph-sm text-text-sub-600">Request from <b className="text-text-strong-950">{current.site}</b>: {current.description}.</div>} />
       )}
       {!data.state.usdc && <div className="mt-4 text-center"><Button.Root asChild variant="neutral" mode="ghost" size="small"><a href="/wallet">Add money first to try sponsored actions</a></Button.Root></div>}
+    </div>
+  );
+}
+
+/** The four checks Swissquote runs. Static, so the skeleton shows them too. */
+function ProtectionTiles() {
+  return (
+    <div className="mb-6 grid gap-3 sm:grid-cols-4">
+      {[
+        { icon: RiShieldCheckLine, t: 'Allowlist', d: 'Known contracts only' },
+        { icon: RiFlaskLine, t: 'Simulation', d: 'Exact balance changes' },
+        { icon: RiSearchEyeLine, t: 'Sanctions screen', d: 'Every counterparty' },
+        { icon: RiShieldKeyholeLine, t: 'High-value step-up', d: `Above ${formatUsdc(STEP_UP_THRESHOLD)} USDC or unlimited` },
+      ].map((s) => (
+        <div key={s.t} className="flex items-center gap-3 rounded-2xl bg-bg-white-0 p-3 ring-1 ring-inset ring-stroke-soft-200">
+          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary-alpha-10 text-primary-base"><s.icon className="size-5" /></span>
+          <div><div className="text-label-sm text-text-strong-950">{s.t}</div><div className="text-paragraph-xs text-text-sub-600">{s.d}</div></div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DappsSkeleton() {
+  return (
+    <div className="mx-auto max-w-[860px]">
+      {title}
+      <ProtectionTiles />
+      <Skeleton className="grid gap-4 md:grid-cols-2">
+        {[0, 1].map((i) => (
+          <BoneCard key={i} className="md:p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3"><Bone className="size-11 rounded-xl" /><div className="space-y-1.5"><Bone className="h-4 w-28" /><Bone className="h-3 w-24" /></div></div>
+              <Bone className="h-6 w-24 rounded-md" />
+            </div>
+            <BoneLines className="mt-4" />
+            <div className="mt-4 space-y-2">{[0, 1].map((j) => <Bone key={j} className="h-[60px] w-full rounded-xl" />)}</div>
+          </BoneCard>
+        ))}
+      </Skeleton>
     </div>
   );
 }

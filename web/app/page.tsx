@@ -21,12 +21,12 @@ import {
   INSTRUMENTS, PERIOD_LABEL, formatPct, formatPrice, formatSigned, instrument, portfolioSeries, prevClose, priceSeries, useMarket, valuation,
   type Instrument, type MarketState, type Period, type Point,
 } from '@/lib/market';
+import { Bone, BoneCard, Skeleton } from '@/components/skeleton';
 import { cn } from '@/utils/cn';
 
 export default function Home() {
-  const { client, ready } = useSession();
-  if (!ready) return null;
-  return client ? <Dashboard /> : <Landing />;
+  const { signedIn } = useSession();
+  return signedIn ? <Dashboard /> : <Landing />;
 }
 
 function Landing() {
@@ -104,7 +104,17 @@ function Dashboard() {
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         <TradingCard s={s} />
         <aside className="flex flex-col gap-6">
-          {unknown && <div className="min-h-[220px] flex-1 animate-pulse rounded-3xl bg-bg-weak-50 ring-1 ring-inset ring-stroke-soft-200" />}
+          {unknown && (
+            <Skeleton className="flex flex-1">
+              <BoneCard className="flex min-h-[220px] flex-1 flex-col md:p-5">
+                <div className="flex items-center justify-between"><Bone className="h-4 w-36" /><Bone className="size-5 rounded-full" /></div>
+                <Bone className="mt-4 h-7 w-40" />
+                <Bone className="mt-2 h-4 w-20" />
+                <Bone className="mt-3 min-h-14 w-full flex-1 rounded-xl" />
+                <Bone className="mt-3 h-4 w-32" />
+              </BoneCard>
+            </Skeleton>
+          )}
           {deployed && wallet && (
             <Link href="/wallet" className="flex flex-1 flex-col rounded-3xl bg-bg-white-0 p-5 shadow-regular-xs ring-1 ring-inset ring-stroke-soft-200 transition hover:shadow-regular-md active:scale-[0.99]">
               <div className="flex items-center justify-between">

@@ -1,4 +1,6 @@
 import type { Metadata, Viewport } from 'next';
+import { Suspense } from 'react';
+import { cookies } from 'next/headers';
 import './globals.css';
 import { SessionProvider } from '@/components/session';
 import { AppShell } from '@/components/app-shell';
@@ -12,16 +14,25 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = { themeColor: '#ffffff', width: 'device-width', initialScale: 1 };
 
+/** Reads the session cookie so the first render (and the server HTML) already has the signed-in layout and its skeletons. */
+async function Session({ children }: { children: React.ReactNode }) {
+  const hasCookie = (await cookies()).has('sq_session');
+  return <SessionProvider hasCookie={hasCookie}>{children}</SessionProvider>;
+}
+
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
       {/* Extensions such as ColorZilla add attributes to <body> before hydration. */}
       <body suppressHydrationWarning>
-        <SessionProvider>
-          <AppShell>{children}</AppShell>
-          <AlertWatcher />
-          <NotificationProvider />
-        </SessionProvider>
+        {/* The cookie read is instant, so the real tree streams in the same response as this fallback. */}
+        <Suspense fallback={<div className="min-h-dvh" />}>
+          <Session>
+            <AppShell>{children}</AppShell>
+            <AlertWatcher />
+            <NotificationProvider />
+          </Session>
+        </Suspense>
       </body>
     </html>
   );

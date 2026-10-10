@@ -14,6 +14,8 @@ import { ActivityList } from '@/components/activity-list';
 import { RecoveryBanner } from '@/components/recovery-banner';
 import { ReplacedDeviceNotice } from '@/components/replaced-device';
 import { FundSheet } from '@/components/fund-sheet';
+import { NoWallet } from '@/components/no-wallet';
+import { Bone, BoneCard, BoneRow, Skeleton } from '@/components/skeleton';
 import { QuickActions } from '@/components/quick-actions';
 import { WalletBalanceChart } from '@/components/wallet-chart';
 import { useActivity, useWallet } from '@/lib/hooks';
@@ -29,17 +31,9 @@ function WalletHome() {
   const { data, refresh, loading } = useWallet();
   const activity = useActivity();
   const [fundOpen, setFundOpen] = useState(false);
-  if (loading && !data) return <div className="mx-auto h-64 max-w-[1080px] animate-pulse rounded-3xl bg-bg-white-0" />;
+  if (loading && !data) return <WalletSkeleton />;
   const wallet = data?.wallet;
-  if (!wallet || !data?.state?.deployed) {
-    return (
-      <div className="mx-auto max-w-[480px] rounded-3xl bg-bg-white-0 p-8 text-center ring-1 ring-inset ring-stroke-soft-200">
-        <h1 className="text-title-h5 text-text-strong-950">{wallet ? 'Finish setting up your wallet' : 'No wallet yet'}</h1>
-        <p className="mt-2 text-paragraph-sm text-text-sub-600">Create a passkey-controlled wallet next to your Swissquote account. It takes under a minute.</p>
-        <Button.Root asChild className="mt-6"><Link href="/wallet/new">Open self-custody wallet</Link></Button.Root>
-      </div>
-    );
-  }
+  if (!wallet || !data?.state?.deployed) return <NoWallet started={!!wallet} />;
   const state = data.state;
   const isOwner = state.owners.some((o) => o.toLowerCase() === wallet.owner.signer.toLowerCase());
 
@@ -151,6 +145,40 @@ function WalletHome() {
 
       <FundSheet open={fundOpen} onOpenChange={setFundOpen} verified={!!proof} onDone={() => { refresh(); activity.refresh(); }} />
     </div>
+  );
+}
+
+/** Mirrors WalletHome's layout, so nothing jumps when the data arrives. */
+function WalletSkeleton() {
+  return (
+    <Skeleton className="mx-auto grid max-w-[1080px] gap-6 lg:grid-cols-[1fr_340px]">
+      <div className="min-w-0 space-y-6">
+        <BoneCard className="shadow-regular-xs">
+          <div className="flex items-center justify-between gap-3"><Bone className="h-5 w-36" /><Bone className="h-6 w-28 rounded-full" /></div>
+          <Bone className="mt-4 h-9 w-52" />
+          <Bone className="mt-2 h-4 w-24" />
+          <Bone className="mt-5 h-[132px] w-full rounded-xl" />
+          <div className="mt-6 grid grid-cols-4 gap-2">
+            {[0, 1, 2, 3].map((i) => <div key={i} className="flex flex-col items-center gap-2"><Bone className="size-[52px] rounded-full" /><Bone className="h-4 w-12" /></div>)}
+          </div>
+        </BoneCard>
+        <BoneCard><Bone className="mb-2 h-5 w-16" /><BoneRow /><BoneRow /></BoneCard>
+        <BoneCard><Bone className="mb-2 h-5 w-32" /><BoneRow /><BoneRow /><BoneRow /></BoneCard>
+      </div>
+      <aside className="space-y-6">
+        <BoneCard className="md:p-5">
+          <div className="flex items-center justify-between"><Bone className="h-5 w-24" /><Bone className="h-5 w-20 rounded-full" /></div>
+          <div className="mt-4 space-y-4">
+            {[0, 1, 2, 3].map((i) => <div key={i} className="flex gap-3"><Bone className="size-8 shrink-0 rounded-lg" /><div className="flex-1 space-y-1.5"><Bone className="h-3.5 w-3/4" /><Bone className="h-3 w-full" /></div></div>)}
+          </div>
+          <Bone className="mt-5 h-9 w-full rounded-lg" />
+        </BoneCard>
+        <BoneCard className="md:p-5">
+          <Bone className="mb-3 h-5 w-28" />
+          {[0, 1, 2, 3].map((i) => <div key={i} className="flex justify-between py-2.5"><Bone className="h-3.5 w-20" /><Bone className="h-3.5 w-24" /></div>)}
+        </BoneCard>
+      </aside>
+    </Skeleton>
   );
 }
 

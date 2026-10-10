@@ -11,6 +11,7 @@ import * as Alert from '@/components/ui/alert';
 import * as ProgressBar from '@/components/ui/progress-bar';
 import { RequireLogin } from '@/components/require-login';
 import { PageTitle } from '@/components/page-title';
+import { Bone, BoneCard, BoneLines, Skeleton } from '@/components/skeleton';
 import { CardUnlock } from '@/components/card-unlock';
 import { MockTag } from '@/components/brand';
 import { useSession } from '@/components/session';
@@ -59,7 +60,7 @@ function Recover() {
   }, [sessionId]);
 
   if (error) return <div className="mx-auto max-w-[560px]"><Alert.Root status="error" variant="lighter" size="large"><Alert.Icon />{error}</Alert.Root></div>;
-  if (!info) return <div className="mx-auto h-64 max-w-[560px] animate-pulse rounded-3xl bg-bg-white-0" />;
+  if (!info) return <RecoverSkeleton />;
   if (!info.wallet) return <div className="mx-auto max-w-[560px] rounded-3xl bg-bg-white-0 p-8 text-center ring-1 ring-inset ring-stroke-soft-200"><div className="text-title-h6">No wallet for this client</div><p className="mt-2 text-paragraph-sm text-text-sub-600">There is nothing to recover. <Link className="text-primary-base" href="/wallet/new">Open a wallet</Link>.</p></div>;
 
   const s = info.session;
@@ -78,6 +79,22 @@ function Recover() {
         {stage === 'refused' && <Ended tone="error" title="Recovery refused" body="Swissquote's face check did not match the ID on file, so its guardian key did not sign. Without Swissquote's approval and your own recovery factor, nobody can replace the passkey. The owner was alerted on every channel." onRestart={() => { localStorage.removeItem(LS); setSessionId(null); setNewKey(null); load(null); }} />}
         {stage === 'cancelled' && <Ended tone="warning" title="Recovery cancelled by the owner" body="A device that still holds the current passkey tapped “This wasn't me” and cancelled the request on-chain. Nothing changed." onRestart={() => { localStorage.removeItem(LS); setSessionId(null); setNewKey(null); load(null); }} />}
       </div>
+    </div>
+  );
+}
+
+/** Title, the five step bars and one panel, like the first stage of Recover. */
+function RecoverSkeleton() {
+  return (
+    <div className="mx-auto max-w-[620px]">
+      <PageTitle title="Recover your wallet" subtitle={<Bone className="my-[3px] h-3.5 w-72 max-w-full" />} back="/" />
+      <Skeleton>
+        <div className="grid grid-cols-5 gap-1.5">{[0, 1, 2, 3, 4].map((i) => <Bone key={i} className="h-1.5 rounded-full" />)}</div>
+        <BoneCard className="mt-5 space-y-5 md:p-8">
+          <div className="space-y-2"><Bone className="h-6 w-2/3" /><BoneLines /></div>
+          <Bone className="h-12 w-full rounded-10" />
+        </BoneCard>
+      </Skeleton>
     </div>
   );
 }
@@ -279,11 +296,12 @@ function Pending({ info, session, onChange }: { info: Info; session: PublicRecov
 function Finalized({ session, onReset }: { session: PublicRecoverySession; onReset: () => void }) {
   const { client, refresh } = useSession();
   useEffect(() => {
-    saveDevice({ clientId: client!.clientId, wallet: session.wallet, owner: { credentialId: session.newOwner.credentialId, x: session.newOwner.x, y: session.newOwner.y }, createdAt: Date.now() });
+    if (!client) return; // the page can render before the session request returns
+    saveDevice({ clientId: client.clientId, wallet: session.wallet, owner: { credentialId: session.newOwner.credentialId, x: session.newOwner.x, y: session.newOwner.y }, createdAt: Date.now() });
     refresh();
     onReset();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [client?.clientId]);
   return (
     <Panel className="text-center">
       <span className="mx-auto grid size-14 place-items-center rounded-full bg-success-lighter text-success-base"><RiCheckLine className="size-8" /></span>

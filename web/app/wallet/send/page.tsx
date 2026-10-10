@@ -9,6 +9,8 @@ import { RequireLogin } from '@/components/require-login';
 import { PageTitle } from '@/components/page-title';
 import { TxSheet } from '@/components/tx-sheet';
 import { ReplacedDeviceNotice } from '@/components/replaced-device';
+import { NoWallet } from '@/components/no-wallet';
+import { Bone, BoneCard, Skeleton } from '@/components/skeleton';
 import { useWallet } from '@/lib/hooks';
 import { useConfig } from '@/lib/use-config';
 import { useTxFlow } from '@/lib/use-tx-flow';
@@ -21,14 +23,17 @@ export default function SendPage() {
   return <RequireLogin><Send /></RequireLogin>;
 }
 
+const title = <PageTitle title="Send USDC" subtitle="Signed by your passkey. Swissquote sponsors the network fee when the transfer passes its checks." back="/wallet" />;
+
 function Send() {
-  const { data, refresh } = useWallet(10000);
+  const { data, refresh, loading } = useWallet(10000);
   const cfg = useConfig();
   const [to, setTo] = useState('');
   const [amountText, setAmountText] = useState('');
   const [open, setOpen] = useState(false);
   const wallet = data?.wallet;
-  if (!wallet || !data?.state) return <div className="mx-auto h-64 max-w-[560px] animate-pulse rounded-3xl bg-bg-white-0" />;
+  if (loading && !data) return <SendSkeleton />;
+  if (!wallet || !data?.state?.deployed) return <NoWallet started={!!wallet} />;
   return <SendForm data={{ ...data, wallet }} cfg={cfg} to={to} setTo={setTo} amountText={amountText} setAmountText={setAmountText} open={open} setOpen={setOpen} refresh={refresh} />;
 }
 
@@ -48,7 +53,7 @@ function SendForm({ data, cfg, to, setTo, amountText, setAmountText, open, setOp
 
   return (
     <div className="mx-auto max-w-[560px]">
-      <PageTitle title="Send USDC" subtitle="Signed by your passkey. Swissquote sponsors the network fee when the transfer passes its checks." back="/wallet" />
+      {title}
       <div className="mb-4 empty:hidden"><ReplacedDeviceNotice wallet={wallet} /></div>
       <div className="space-y-6 rounded-3xl bg-bg-white-0 p-5 ring-1 ring-inset ring-stroke-soft-200 md:p-6">
         <div className="space-y-2">
@@ -93,6 +98,29 @@ function SendForm({ data, cfg, to, setTo, amountText, setAmountText, open, setOp
             <div className="text-paragraph-sm text-text-sub-600">to {contact?.name ?? 'address'} · <span className="font-mono text-paragraph-xs">{shortAddress(to)}</span></div>
           </div>
         ) : null} />
+    </div>
+  );
+}
+
+function SendSkeleton() {
+  return (
+    <div className="mx-auto max-w-[560px]">
+      {title}
+      <Skeleton>
+        <BoneCard className="space-y-6">
+          <div className="space-y-2">
+            <Bone className="h-4 w-20" />
+            <div className="flex flex-wrap gap-2">{CONTACTS.map((c) => <Bone key={c.address} className="h-9 w-28 rounded-full" />)}</div>
+            <Bone className="h-10 w-full rounded-10" />
+          </div>
+          <div className="space-y-2">
+            <Bone className="h-4 w-16" />
+            <Bone className="h-[60px] w-full rounded-2xl" />
+            <Bone className="ml-auto h-3 w-56" />
+          </div>
+          <Bone className="h-12 w-full rounded-10" />
+        </BoneCard>
+      </Skeleton>
     </div>
   );
 }
