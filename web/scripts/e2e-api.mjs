@@ -9,12 +9,13 @@ const MODULE = '0x949d01d424bE050D09C16025dd007CB59b3A8c66';
 const srm = new SocialRecoveryModule(MODULE);
 const NODE = BASE + '/api/rpc/node', BUNDLER = BASE + '/api/rpc/bundler';
 const t0 = Date.now(); const log = (...a) => console.log(`[${String(Math.round((Date.now() - t0) / 1000)).padStart(3)}s]`, ...a);
-let cookie = '';
+const jar = {}; // cookie name → value
+const cookie = () => Object.entries(jar).map(([k, v]) => `${k}=${v}`).join('; ');
 const stringify = (v) => JSON.stringify(v, (_k, x) => (typeof x === 'bigint' ? { $big: x.toString() } : x));
 const parse = (t) => JSON.parse(t, (_k, v) => (v && typeof v === 'object' && typeof v.$big === 'string' ? BigInt(v.$big) : v));
 async function api(path, data) {
-  const res = await fetch(BASE + path, { method: data === undefined ? 'GET' : 'POST', headers: { 'content-type': 'application/json', cookie }, body: data === undefined ? undefined : stringify(data) });
-  const sc = res.headers.get('set-cookie'); if (sc) cookie = sc.split(';')[0];
+  const res = await fetch(BASE + path, { method: data === undefined ? 'GET' : 'POST', headers: { 'content-type': 'application/json', cookie: cookie() }, body: data === undefined ? undefined : stringify(data) });
+  for (const sc of res.headers.getSetCookie()) { const [k, v] = sc.split(';')[0].split('='); if (v) jar[k] = v; else delete jar[k]; }
   const out = parse(await res.text());
   if (!res.ok) throw Object.assign(new Error(out.error), { status: res.status });
   return out;
@@ -94,7 +95,15 @@ await expectFail(api('/api/recovery', { action: 'liveness', id: s1.id, result: '
 await expectFail(api('/api/recovery', { action: 'liveness', id: s1.id, result: 'match' }), 'retrying liveness on a refused request');
 await expectFail(api('/api/recovery', { action: 'finalize', id: s1.id }), 'finalizing a refused request');
 
-// 6. Legit recovery
+// 6. Legit recovery, from a new device: identifying for recovery must not log in
+for (const k of Object.keys(jar)) delete jar[k];
+await expectFail(api('/api/recovery'), 'recovery without identifying');
+await expectFail(api('/api/recovery', { action: 'identify', clientId: '2162953', password: 'wrong' }), 'identifying with a wrong password');
+await api('/api/recovery', { action: 'identify', clientId: '2162953', password: 'demo' });
+if ((await api('/api/session')).client) throw new Error('recovery identification created a full session');
+await expectFail(api('/api/wallet'), 'wallet API with a recovery-only session');
+await expectFail(api('/api/activity'), 'activity API with a recovery-only session');
+log('  ✓ recovery identification is not a login');
 const newOwner = mk();
 const s = (await api('/api/recovery', { action: 'start', newOwner: { ...newOwner.publicKey, credentialId: 'new' } })).session;
 const gSig = Safe.createWebAuthnSignature(await gB.getAssertion(Buffer.from(s.hash.slice(2), 'hex')));
@@ -109,6 +118,8 @@ log('  waiting', Math.round(waitMs / 1000), 's for the delay');
 await new Promise((r) => setTimeout(r, Math.max(0, waitMs)));
 const fin = (await api('/api/recovery', { action: 'finalize', id: s.id })).session;
 log('7 finalized', fin.status, fin.finalizedTx);
+if (!(await api('/api/session')).client) throw new Error('finalizing did not upgrade the recovery session to a login');
+log('  ✓ recovery session upgraded to a login');
 const st = await api('/api/wallet');
 log('  owners', st.state.owners, 'expected', Safe.createWebAuthnSignerVerifierAddress(newOwner.publicKey.x, newOwner.publicKey.y));
 

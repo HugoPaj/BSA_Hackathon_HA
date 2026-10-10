@@ -103,11 +103,15 @@ const TabMenuHorizontalTrigger = React.forwardRef<
       ref={forwardedRef}
       className={cn(
         // base
-        'group/tab-item h-12 py-3.5 text-label-sm text-text-sub-600 outline-none',
+        'group/tab-item relative h-12 py-3.5 text-label-sm text-text-sub-600 outline-none',
         'flex items-center justify-center gap-1.5',
         'transition duration-200 ease-out',
+        // hover: darken the label and preview the underline in a soft grey
+        "after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 after:scale-x-50 after:rounded-full after:bg-stroke-sub-300 after:opacity-0 after:transition after:duration-200 after:ease-out after:content-['']",
+        'hover:text-text-strong-950 hover:after:scale-x-100 hover:after:opacity-100',
+        'data-[state=active]:after:hidden',
         // focus
-        'focus:outline-none',
+        'focus:outline-none focus-visible:text-text-strong-950',
         // active
         'data-[state=active]:text-text-strong-950',
         className,

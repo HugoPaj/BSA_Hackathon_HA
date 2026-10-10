@@ -2,13 +2,15 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import {
-  RiArrowLeftRightLine, RiArrowRightSLine, RiBankCardLine, RiCoinsLine, RiExchangeLine, RiFingerprintLine, RiGasStationLine,
-  RiHandCoinLine, RiLineChartLine, RiListUnordered, RiScales3Line, RiShieldCheckFill, RiShieldKeyholeLine, RiWallet3Line,
+  RiArrowLeftRightLine, RiArrowRightLine, RiArrowRightSLine, RiBankCardLine, RiCoinsLine, RiExchangeLine, RiFingerprintLine,
+  RiHandCoinLine, RiLineChartLine, RiListUnordered, RiScales3Line, RiShieldCheckFill, RiTimeLine, RiUser3Line, RiWallet3Line,
 } from '@remixicon/react';
 import * as Button from '@/components/ui/button';
-import { LoginCard } from '@/components/login-card';
+import * as SegmentedControl from '@/components/ui/segmented-control';
+import { LoginForm } from '@/components/login-card';
+import { SplitHeadline, SplitScreen } from '@/components/split-screen';
 import { useSession } from '@/components/session';
-import { SwissFlag } from '@/components/brand';
+import { SqMark, SwissFlag } from '@/components/brand';
 import { AreaChart, Sparkline } from '@/components/charts';
 import { FundSheet } from '@/components/fund-sheet';
 import { ChangePill, InstrumentLogo, InstrumentRow, PeriodControl, formatChartTime } from '@/components/market-ui';
@@ -30,39 +32,67 @@ export default function Home() {
 }
 
 function Landing() {
+  const [tab, setTab] = useState<'signin' | 'recover'>('signin');
+  const copy = tab === 'signin'
+    ? { title: 'Welcome back', sub: 'Log in with your Swissquote client number to open or manage your wallet.' }
+    : { title: 'Recover your wallet', sub: 'Lost your device? Replace your passkey without a seed phrase. Same address, same funds.' };
   return (
-    <div className="grid items-center gap-10 lg:grid-cols-[1fr_420px] lg:gap-16">
-      <section className="animate-fade-in-up">
-        <div className="text-subheading-xs uppercase tracking-wider text-primary-base">Swissquote self-custody wallet</div>
-        <h1 className="sq-display mt-4 text-[40px] text-text-strong-950 md:text-[64px]">Your keys.<br /><span className="text-primary-base">Your control.</span></h1>
-        <p className="mt-6 max-w-xl text-[18px] leading-relaxed text-text-sub-600">
-          A wallet only you can spend from, one tap from your Swissquote account. No seed phrase: your face or fingerprint signs.
-          Lose your phone and Swissquote helps you recover, but can never move your money.
-        </p>
-        <div className="mt-8 grid max-w-xl gap-3 sm:grid-cols-3">
-          {[
-            { icon: RiFingerprintLine, t: 'Passkey signs', d: 'Face ID, Touch ID, Windows Hello' },
-            { icon: RiShieldKeyholeLine, t: 'Thief-proof recovery', d: 'Bank + your own factor + delay' },
-            { icon: RiGasStationLine, t: 'No gas to buy', d: 'Swissquote sponsors the network fee' },
-          ].map((f) => (
-            <div key={f.t} className="rounded-2xl bg-bg-white-0 p-4 ring-1 ring-inset ring-stroke-soft-200">
-              <span className="grid size-9 place-items-center rounded-lg bg-primary-alpha-10 text-primary-base"><f.icon className="size-5" /></span>
-              <div className="mt-3 text-label-sm text-text-strong-950">{f.t}</div>
-              <div className="mt-0.5 text-paragraph-xs text-text-sub-600">{f.d}</div>
-            </div>
-          ))}
+    <SplitScreen
+      image="/landing/hero.webp"
+      art={<SplitHeadline>Your keys.<br /><span className="text-primary-base">Your control.</span></SplitHeadline>}
+    >
+      <div className="m-auto w-full max-w-[400px] animate-fade-in-up">
+        <div className="text-center">
+          <SqMark className="mx-auto size-10" />
+          <h2 className="mt-5 text-title-h4 text-text-strong-950">{copy.title}</h2>
+          <p className="mx-auto mt-2 max-w-[340px] text-paragraph-sm text-text-sub-600">{copy.sub}</p>
         </div>
-      </section>
-      <div className="space-y-3">
-        <LoginCard subtitle="Use your Swissquote client login to open or manage your wallet." />
-        <Link href="/recover" className="flex items-center justify-between rounded-2xl bg-bg-white-0 px-5 py-4 ring-1 ring-inset ring-stroke-soft-200 transition hover:bg-bg-weak-50 active:scale-[0.99]">
-          <span>
-            <span className="block text-label-sm text-text-strong-950">Lost your device?</span>
-            <span className="block text-paragraph-xs text-text-sub-600">Recover your wallet with a new passkey</span>
-          </span>
-          <RiArrowRightSLine className="size-5 text-text-soft-400" />
-        </Link>
+        <SegmentedControl.Root value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="mt-7">
+          <SegmentedControl.List>
+            <SegmentedControl.Trigger value="signin" className="h-8">Log in</SegmentedControl.Trigger>
+            <SegmentedControl.Trigger value="recover" className="h-8">Recover access</SegmentedControl.Trigger>
+          </SegmentedControl.List>
+          <SegmentedControl.Content value="signin" className="mt-6 animate-fade-in-up outline-none">
+            <LoginForm />
+          </SegmentedControl.Content>
+          <SegmentedControl.Content value="recover" className="mt-6 animate-fade-in-up outline-none">
+            <RecoverPanel />
+          </SegmentedControl.Content>
+        </SegmentedControl.Root>
       </div>
+      <div className="mt-10 flex items-center justify-center gap-2 text-paragraph-xs text-text-soft-400">
+        <SwissFlag className="size-3" /> Swiss bank, self-custody wallet
+      </div>
+    </SplitScreen>
+  );
+}
+
+function RecoverPanel() {
+  const steps = [
+    { icon: RiUser3Line, t: 'Log in to Swissquote', d: 'Your usual e-banking login, on the new device.' },
+    { icon: RiFingerprintLine, t: 'Create a new passkey', d: 'Face ID, Touch ID or Windows Hello on this device.' },
+    { icon: RiTimeLine, t: 'Approve, then a safety delay', d: 'Your recovery factor and Swissquote both sign. Your old device can cancel.' },
+  ];
+  return (
+    <div>
+      <ol className="space-y-1">
+        {steps.map((s, i) => (
+          <li key={s.t} className="flex gap-3 rounded-2xl p-3 transition hover:bg-bg-weak-50">
+            <span className="relative grid size-9 shrink-0 place-items-center rounded-lg bg-primary-alpha-10 text-primary-base">
+              <s.icon className="size-[18px]" />
+              <span className="absolute -right-1 -top-1 grid size-4 place-items-center rounded-full bg-bg-white-0 text-[10px] font-medium text-text-sub-600 ring-1 ring-stroke-soft-200">{i + 1}</span>
+            </span>
+            <span>
+              <span className="block text-label-sm text-text-strong-950">{s.t}</span>
+              <span className="block text-paragraph-xs text-text-sub-600">{s.d}</span>
+            </span>
+          </li>
+        ))}
+      </ol>
+      <Button.Root asChild className="mt-5 w-full">
+        <Link href="/recover">Start recovery<Button.Icon as={RiArrowRightLine} /></Link>
+      </Button.Root>
+      <p className="mt-4 text-center text-paragraph-xs text-text-soft-400">Swissquote never holds a key that can spend. It can only co-approve a passkey replacement.</p>
     </div>
   );
 }

@@ -8,7 +8,7 @@ import * as Hint from '@/components/ui/hint';
 import { RequireLogin } from '@/components/require-login';
 import { PageTitle } from '@/components/page-title';
 import { TxSheet } from '@/components/tx-sheet';
-import { ReplacedDeviceNotice } from '@/components/replaced-device';
+import { DeviceNotice } from '@/components/device-notice';
 import { NoWallet } from '@/components/no-wallet';
 import { Bone, BoneCard, Skeleton } from '@/components/skeleton';
 import { useWallet } from '@/lib/hooks';
@@ -54,7 +54,7 @@ function SendForm({ data, cfg, to, setTo, amountText, setAmountText, open, setOp
   return (
     <div className="mx-auto max-w-[560px]">
       {title}
-      <div className="mb-4 empty:hidden"><ReplacedDeviceNotice wallet={wallet} /></div>
+      <div className="mb-4 empty:hidden"><DeviceNotice wallet={wallet} /></div>
       <div className="space-y-6 rounded-3xl bg-bg-white-0 p-5 ring-1 ring-inset ring-stroke-soft-200 md:p-6">
         <div className="space-y-2">
           <Label.Root>Recipient</Label.Root>

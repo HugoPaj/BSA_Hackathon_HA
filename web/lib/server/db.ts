@@ -66,7 +66,7 @@ export type AuditEntry = { id: string; ts: number; actor: string; action: string
 export type StepUp = { id: string; wallet: string; challenge: string; callDataHash: string; expires: number; verified?: boolean };
 
 type DB = {
-  sessions: Record<string, { clientId: string; createdAt: number }>;
+  sessions: Record<string, { clientId: string; createdAt: number; scope?: 'recovery'; recoveryId?: string }>;
   wallets: Record<string, WalletRecord>; // by clientId
   recoveries: Record<string, RecoverySession>;
   alerts: Alert[];

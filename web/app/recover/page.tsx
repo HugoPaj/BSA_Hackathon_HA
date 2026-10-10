@@ -2,20 +2,20 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
-  RiArrowRightLine, RiBankLine, RiCheckLine, RiCloseCircleFill, RiFingerprintLine, RiMacbookLine, RiShieldKeyholeLine,
-  RiTimeLine, RiUserForbidLine, RiCameraLine, RiCheckboxCircleFill, RiIdCardLine, RiExternalLinkLine,
+  RiArrowLeftLine, RiArrowRightLine, RiCheckLine, RiCloseCircleFill, RiShieldCheckLine, RiFingerprintLine, RiMacbookLine,
+  RiUserForbidLine, RiCameraLine, RiCheckboxCircleFill, RiExternalLinkLine,
 } from '@remixicon/react';
 import * as FancyButton from '@/components/ui/fancy-button';
 import * as Button from '@/components/ui/button';
 import * as Alert from '@/components/ui/alert';
 import * as ProgressBar from '@/components/ui/progress-bar';
-import { RequireLogin } from '@/components/require-login';
-import { PageTitle } from '@/components/page-title';
-import { Bone, BoneCard, BoneLines, Skeleton } from '@/components/skeleton';
+import { LoginForm } from '@/components/login-card';
+import { SplitScreen } from '@/components/split-screen';
+import { Bone, BoneLines, Skeleton } from '@/components/skeleton';
 import { CardUnlock } from '@/components/card-unlock';
 import { MockTag } from '@/components/brand';
 import { useSession } from '@/components/session';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { createPasskey, hexToBytes, signWithPasskey, type Passkey } from '@/lib/passkey';
 import { Safe, type WalletState } from '@/lib/chain';
 import { friendly, type CardSigner } from '@/lib/use-tx-flow';
@@ -26,23 +26,30 @@ import { EXPLORER, RECOVERY_DELAY_LABEL, RECOVERY_DELAY_PRODUCTION } from '@/lib
 import type { PublicRecoverySession, WalletRecord } from '@/lib/server/db';
 import { cn } from '@/utils/cn';
 
-type Info = { wallet: Pick<WalletRecord, 'address' | 'guardianA' | 'guardianB' | 'bankAssisted'> & { deployed: boolean } | null; state?: WalletState; session: PublicRecoverySession | null };
+type Info = { client: { clientId: string; name: string }; wallet: Pick<WalletRecord, 'address' | 'guardianA' | 'guardianB' | 'bankAssisted'> & { deployed: boolean } | null; state?: WalletState; session: PublicRecoverySession | null };
 const LS = 'sq.recovery.v1';
 
+// One component for the whole flow, logged out included: the layout and its artwork stay mounted
+// from step to step, so the image animates in once instead of on every step.
 export default function RecoverPage() {
-  return <RequireLogin subtitle="Step 1 of recovery: log in to Swissquote e-banking."><Recover /></RequireLogin>;
-}
-
-function Recover() {
+  const { signedIn, logout } = useSession();
   const [info, setInfo] = useState<Info | null>(null);
+  // Recovery doesn't log you in: step 1 only identifies you to /api/recovery. null until its first answer.
+  const [identified, setIdentified] = useState<boolean | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [newKey, setNewKey] = useState<Passkey | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = async (id = sessionId) => {
-    const r = await api<Info>(`/api/recovery${id ? `?id=${id}` : ''}`);
-    setInfo(r);
-    return r;
+    try {
+      const r = await api<Info>(`/api/recovery${id ? `?id=${id}` : ''}`);
+      setInfo(r);
+      setIdentified(true);
+      return r;
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) { setIdentified(false); return null; }
+      throw e;
+    }
   };
   useEffect(() => {
     const saved = localStorage.getItem(LS);
@@ -53,75 +60,132 @@ function Recover() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
-    if (!sessionId) return;
+    if (!sessionId || !identified) return;
     const t = setInterval(() => load(sessionId).catch(() => {}), 4000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId]);
+  }, [sessionId, identified]);
 
-  if (error) return <div className="mx-auto max-w-[560px]"><Alert.Root status="error" variant="lighter" size="large"><Alert.Icon />{error}</Alert.Root></div>;
-  if (!info) return <RecoverSkeleton />;
-  if (!info.wallet) return <div className="mx-auto max-w-[560px] rounded-3xl bg-bg-white-0 p-8 text-center ring-1 ring-inset ring-stroke-soft-200"><div className="text-title-h6">No wallet for this client</div><p className="mt-2 text-paragraph-sm text-text-sub-600">There is nothing to recover. <Link className="text-primary-base" href="/wallet/new">Open a wallet</Link>.</p></div>;
+  // After going back to step 1, ignore whatever the previous identification loaded.
+  const live = identified ? info : null;
+  const steps = recoverySteps(live, !!newKey || !!live?.session, !!identified);
+  const layout = (children: React.ReactNode, back?: Back) => <RecoverLayout steps={steps} wallet={live?.wallet?.address} back={back}>{children}</RecoverLayout>;
+  // Step 1 is identification, so going back from step 2 drops it (and a full login, if recovery started from one).
+  const toLogin = async () => {
+    setError(null); setNewKey(null);
+    await api('/api/recovery', undefined, 'DELETE').catch(() => {});
+    if (signedIn) await logout();
+    setIdentified(false);
+  };
+
+  if (identified === false) {
+    return layout(
+      <Panel>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-title-h4 text-text-strong-950">Identify yourself</h2>
+            <p className="mt-2 text-paragraph-md text-text-sub-600">Use your Swissquote client number and password. This only opens the recovery: you are not logged in to your account on this device until your new passkey takes over.</p>
+          </div>
+          <MockTag>Mock login</MockTag>
+        </div>
+        <LoginForm label="Continue" busyLabel="Checking…" submit={async (clientId, password) => { await api('/api/recovery', { action: 'identify', clientId, password }); await load(); }} />
+      </Panel>,
+      '/',
+    );
+  }
+
+  if (error) return layout(<Alert.Root status="error" variant="lighter" size="large"><Alert.Icon />{error}</Alert.Root>, toLogin);
+  if (!info || !identified) return layout(<RecoverSkeleton />, identified ? toLogin : '/');
+  if (!info.wallet) return layout(<Panel><div><h2 className="text-title-h4 text-text-strong-950">No wallet for this client</h2><p className="mt-2 text-paragraph-md text-text-sub-600">There is nothing to recover. <Link className="text-primary-base" href="/wallet/new">Open a wallet</Link>.</p></div></Panel>, toLogin);
 
   const s = info.session;
   const stage = !s ? (newKey ? 'start' : 'passkey') : s.status === 'collecting' ? 'collect' : s.status;
+  const restart = () => { localStorage.removeItem(LS); setSessionId(null); setNewKey(null); load(null); };
+  // Back steps through everything that is still off-chain. A collecting request only exists on
+  // Swissquote's server, so it can be dropped; once both guardians signed it is on-chain and final.
+  const back: Back = {
+    passkey: toLogin,
+    start: () => setNewKey(null),
+    collect: () => { if (!s?.guardianB || confirm('Go back and discard the approval you already gave?')) restart(); },
+  }[stage as string];
 
-  return (
-    <div className="mx-auto max-w-[620px]">
-      <PageTitle title="Recover your wallet" subtitle={<>Replace a lost passkey for wallet <span className="font-mono text-paragraph-xs">{shortAddress(info.wallet.address)}</span>. Same address, same funds.</>} back="/" />
-      <Steps info={info} hasKey={!!newKey || !!s} />
-      <div className="stagger mt-5 space-y-5">
-        {stage === 'passkey' && <NewPasskey info={info} onCreated={setNewKey} />}
-        {stage === 'start' && newKey && <StartRecovery info={info} newKey={newKey} onStarted={(id) => { setSessionId(id); localStorage.setItem(LS, JSON.stringify({ id })); load(id); }} />}
-        {stage === 'collect' && s && <Collect info={info} session={s} onChange={() => load()} />}
-        {stage === 'pending' && s && <Pending info={info} session={s} onChange={() => load()} />}
-        {stage === 'finalized' && s && <Finalized session={s} onReset={() => { localStorage.removeItem(LS); }} />}
-        {stage === 'refused' && <Ended tone="error" title="Recovery refused" body="Swissquote's face check did not match the ID on file, so its guardian key did not sign. Without Swissquote's approval and your own recovery factor, nobody can replace the passkey. The owner was alerted on every channel." onRestart={() => { localStorage.removeItem(LS); setSessionId(null); setNewKey(null); load(null); }} />}
-        {stage === 'cancelled' && <Ended tone="warning" title="Recovery cancelled by the owner" body="A device that still holds the current passkey tapped “This wasn't me” and cancelled the request on-chain. Nothing changed." onRestart={() => { localStorage.removeItem(LS); setSessionId(null); setNewKey(null); load(null); }} />}
-      </div>
-    </div>
+  return layout(
+    <>
+      {stage === 'passkey' && <NewPasskey info={info} onCreated={setNewKey} />}
+      {stage === 'start' && newKey && <StartRecovery info={info} newKey={newKey} onStarted={(id) => { setSessionId(id); localStorage.setItem(LS, JSON.stringify({ id })); load(id); }} />}
+      {stage === 'collect' && s && <Collect info={info} session={s} onChange={() => load()} />}
+      {stage === 'pending' && s && <Pending info={info} session={s} onChange={() => load()} />}
+      {stage === 'finalized' && s && <Finalized clientId={info.client.clientId} session={s} onReset={() => { localStorage.removeItem(LS); }} />}
+      {stage === 'refused' && <Ended tone="error" title="Recovery refused" body="Swissquote's face check did not match the ID on file, so its guardian key did not sign. Without Swissquote's approval and your own recovery factor, nobody can replace the passkey. The owner was alerted on every channel." onRestart={restart} />}
+      {stage === 'cancelled' && <Ended tone="warning" title="Recovery cancelled by the owner" body="A device that still holds the current passkey tapped “This wasn't me” and cancelled the request on-chain. Nothing changed." onRestart={restart} />}
+    </>,
+    back,
   );
 }
 
-/** Title, the five step bars and one panel, like the first stage of Recover. */
+type Step = { t: string; done: boolean; failed?: boolean };
+/** Where Back goes: a URL, an action that returns to the previous step, or nothing once the flow can't go back. */
+type Back = string | (() => void) | undefined;
+
+function recoverySteps(info: Info | null, hasKey: boolean, identified: boolean) {
+  const s = info?.session;
+  const items: Step[] = [
+    { t: 'Identify with your Swissquote login', done: identified },
+    { t: 'New passkey on this device', done: hasKey },
+    { t: 'Your recovery factor approves', done: !!s?.guardianB },
+    { t: 'Swissquote face check approves', done: !!s?.swissquote || s?.liveness?.result === 'match', failed: s?.status === 'refused' },
+    { t: `Safety delay (${RECOVERY_DELAY_LABEL})`, done: s?.status === 'finalized' },
+  ];
+  const current = items.findIndex((i) => !i.done);
+  return { items, current: current === -1 ? items.length : current };
+}
+
+const backClass = '-ml-2 inline-flex items-center gap-1 rounded-lg px-2 py-1 text-label-sm text-text-sub-600 transition hover:bg-bg-weak-50 hover:text-text-strong-950 active:scale-[0.97]';
+
+/**
+ * Split screen: artwork on the left; on the right, navigation pinned to the top, the current step
+ * with a slim progress bar in the middle, and a reassurance line pinned to the bottom.
+ */
+function RecoverLayout({ steps, wallet, back, children }: { steps: ReturnType<typeof recoverySteps>; wallet?: string; back?: Back; children: React.ReactNode }) {
+  const { items, current } = steps;
+  const failed = items.some((i) => i.failed);
+  const eyebrow = failed ? 'Recovery stopped' : current < items.length ? `Step ${current + 1} of ${items.length}` : 'Recovery complete';
+  return (
+    <SplitScreen image="/landing/recover.webp" bannerClassName="h-[180px] sm:h-[260px]">
+      <div className="flex min-h-7 items-center justify-between gap-3">
+        {typeof back === 'string'
+          ? <Link href={back} className={backClass}><RiArrowLeftLine className="size-4" />Back</Link>
+          : back ? <button type="button" onClick={back} className={backClass}><RiArrowLeftLine className="size-4" />Back</button> : <span />}
+        {wallet && <span className="rounded-md bg-bg-weak-50 px-2 py-1 font-mono text-paragraph-xs text-text-sub-600" title={wallet}>{shortAddress(wallet)}</span>}
+      </div>
+      <div className="mx-auto w-full max-w-[520px] pt-8 lg:my-auto lg:py-10">
+        <div className="text-subheading-2xs uppercase tracking-wider text-primary-base">{eyebrow}</div>
+        <div className="mt-3 grid grid-cols-5 gap-1">
+          {items.map((it, i) => (
+            <span key={it.t} title={it.t} className={cn('h-1 rounded-full', it.failed ? 'bg-error-base' : it.done ? 'bg-success-base' : i === current ? 'bg-primary-base' : 'bg-bg-soft-200')} />
+          ))}
+        </div>
+        <div className="mt-6 space-y-5">{children}</div>
+      </div>
+      <div className="mt-10 flex items-center justify-center gap-2 text-paragraph-xs text-text-soft-400">
+        <RiShieldCheckLine className="size-4" />Swissquote never holds a key that can spend
+      </div>
+    </SplitScreen>
+  );
+}
+
+/** Stands in for a step panel while the recovery state loads. */
 function RecoverSkeleton() {
   return (
-    <div className="mx-auto max-w-[620px]">
-      <PageTitle title="Recover your wallet" subtitle={<Bone className="my-[3px] h-3.5 w-72 max-w-full" />} back="/" />
-      <Skeleton>
-        <div className="grid grid-cols-5 gap-1.5">{[0, 1, 2, 3, 4].map((i) => <Bone key={i} className="h-1.5 rounded-full" />)}</div>
-        <BoneCard className="mt-5 space-y-5 md:p-8">
-          <div className="space-y-2"><Bone className="h-6 w-2/3" /><BoneLines /></div>
-          <Bone className="h-12 w-full rounded-10" />
-        </BoneCard>
-      </Skeleton>
-    </div>
-  );
-}
-
-function Steps({ info, hasKey }: { info: Info; hasKey: boolean }) {
-  const s = info.session;
-  const items = [
-    { t: 'Swissquote login', done: true, icon: RiBankLine },
-    { t: 'New passkey on this device', done: hasKey, icon: RiFingerprintLine },
-    { t: 'Your recovery factor approves', done: !!s?.guardianB, icon: info.wallet?.guardianB.type === 'card' ? RiIdCardLine : RiMacbookLine },
-    { t: 'Swissquote face check approves', done: !!s?.swissquote || s?.liveness?.result === 'match', icon: RiShieldKeyholeLine, failed: s?.status === 'refused' },
-    { t: `Safety delay (${RECOVERY_DELAY_LABEL})`, done: s?.status === 'finalized', icon: RiTimeLine, active: s?.status === 'pending' },
-  ];
-  return (
-    <div className="grid grid-cols-5 gap-1.5">
-      {items.map((it, i) => (
-        <div key={i} className="space-y-1.5">
-          <div className={cn('h-1.5 rounded-full', it.failed ? 'bg-error-base' : it.done ? 'bg-success-base' : it.active ? 'bg-warning-base' : 'bg-bg-soft-200')} />
-          <div className={cn('hidden text-paragraph-xs sm:block', it.done ? 'text-text-strong-950' : 'text-text-soft-400')}>{it.t}</div>
-        </div>
-      ))}
-    </div>
+    <Skeleton className="space-y-5">
+      <div className="space-y-2"><Bone className="h-7 w-3/4" /><BoneLines /></div>
+      <Bone className="h-12 w-full rounded-10" />
+    </Skeleton>
   );
 }
 
 function Panel({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <div className={cn('animate-fade-in-up space-y-5 rounded-3xl bg-bg-white-0 p-6 ring-1 ring-inset ring-stroke-soft-200 md:p-8', className)}>{children}</div>;
+  return <div className={cn('animate-fade-in-up space-y-5', className)}>{children}</div>;
 }
 
 function NewPasskey({ info, onCreated }: { info: Info; onCreated: (p: Passkey) => void }) {
@@ -131,8 +195,8 @@ function NewPasskey({ info, onCreated }: { info: Info; onCreated: (p: Passkey) =
   return (
     <Panel>
       <div>
-        <h2 className="text-title-h5 text-text-strong-950">Create a new passkey on this device</h2>
-        <p className="mt-1 text-paragraph-sm text-text-sub-600">It will replace the lost one as the owner of your wallet. The old passkey is revoked on-chain when recovery completes, never rebuilt.</p>
+        <h2 className="text-title-h4 text-text-strong-950">Create a new passkey on this device</h2>
+        <p className="mt-2 text-paragraph-md text-text-sub-600">It will replace the lost one as the owner of your wallet. The old passkey is revoked on-chain when recovery completes, never rebuilt.</p>
       </div>
       {info.state?.recovery && <Alert.Root status="warning" variant="lighter" size="small"><Alert.Icon />A recovery is already pending for this wallet.</Alert.Root>}
       {!info.wallet!.bankAssisted && <Alert.Root status="warning" variant="lighter" size="small"><Alert.Icon />This wallet uses a trusted contact instead of Swissquote. Ask them to approve your request.</Alert.Root>}
@@ -162,14 +226,10 @@ function StartRecovery({ info, newKey, onStarted }: { info: Info; newKey: Passke
 }
 
 function Collect({ info, session, onChange }: { info: Info; session: PublicRecoverySession; onChange: () => void }) {
-  return (
-    <>
-      {!session.guardianB ? <GuardianB info={info} session={session} onDone={onChange} /> : <Approved text={`${info.wallet!.guardianB.label} approved`} />}
-      {session.swissquote ? <Approved text="Swissquote approved after the face check" />
-        : session.liveness?.result === 'match' ? <Approved text="Face check passed. Swissquote signs as soon as your recovery factor approves." />
-        : <Liveness session={session} onDone={onChange} />}
-    </>
-  );
+  // One guardian at a time, in the order of the steps: your recovery factor, then Swissquote's face check.
+  if (!session.guardianB) return <GuardianB info={info} session={session} onDone={onChange} />;
+  if (session.swissquote || session.liveness?.result === 'match') return <Approved text="Face check passed. Swissquote is signing the request." />;
+  return <><Approved text={`${info.wallet!.guardianB.label} approved`} /><Liveness session={session} onDone={onChange} /></>;
 }
 
 function Approved({ text }: { text: string }) {
@@ -185,9 +245,8 @@ function GuardianB({ info, session, onDone }: { info: Info; session: PublicRecov
   return (
     <Panel>
       <div>
-        <div className="text-subheading-2xs uppercase tracking-wider text-text-soft-400">Guardian B · something only you have</div>
-        <h2 className="mt-1 text-title-h5 text-text-strong-950">Approve with your {gB.type === 'passkey' ? 'recovery device' : 'recovery card'}</h2>
-        <p className="mt-1 text-paragraph-sm text-text-sub-600">
+        <h2 className="text-title-h4 text-text-strong-950">Approve with your {gB.type === 'passkey' ? 'recovery device' : 'recovery card'}</h2>
+        <p className="mt-2 text-paragraph-md text-text-sub-600">
           {gB.type === 'passkey' ? 'Your browser will ask for the recovery passkey. Choose “Use another device” and scan the QR code with the phone or laptop that holds it, or use your security key.' : 'Use the recovery card you printed or copied when you created your wallet, plus the PIN you chose for it. The card key signs the request in this browser and is never sent anywhere.'}
         </p>
       </div>
@@ -240,9 +299,8 @@ function Liveness({ session, onDone }: { session: PublicRecoverySession; onDone:
     <Panel>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-subheading-2xs uppercase tracking-wider text-text-soft-400">Guardian A · Swissquote</div>
-          <h2 className="mt-1 text-title-h5 text-text-strong-950">Face check against your ID</h2>
-          <p className="mt-1 text-paragraph-sm text-text-sub-600">Swissquote&apos;s guardian key signs only after a live face match against your KYC file, approved by two operators. An e-mail link or SMS code is never enough.</p>
+          <h2 className="text-title-h4 text-text-strong-950">Face check against your ID</h2>
+          <p className="mt-2 text-paragraph-md text-text-sub-600">Swissquote&apos;s guardian key signs only after a live face match against your KYC file, approved by two operators. An e-mail link or SMS code is never enough.</p>
         </div>
         <MockTag>Mock liveness</MockTag>
       </div>
@@ -293,19 +351,18 @@ function Pending({ info, session, onChange }: { info: Info; session: PublicRecov
   );
 }
 
-function Finalized({ session, onReset }: { session: PublicRecoverySession; onReset: () => void }) {
-  const { client, refresh } = useSession();
+function Finalized({ clientId, session, onReset }: { clientId: string; session: PublicRecoverySession; onReset: () => void }) {
+  const { refresh } = useSession();
   useEffect(() => {
-    if (!client) return; // the page can render before the session request returns
-    saveDevice({ clientId: client.clientId, wallet: session.wallet, owner: { credentialId: session.newOwner.credentialId, x: session.newOwner.x, y: session.newOwner.y }, createdAt: Date.now() });
-    refresh();
+    saveDevice({ clientId, wallet: session.wallet, owner: { credentialId: session.newOwner.credentialId, x: session.newOwner.x, y: session.newOwner.y }, createdAt: Date.now() });
+    refresh(); // finalising turned the recovery session into a normal login
     onReset();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [client?.clientId]);
+  }, []);
   return (
     <Panel className="text-center">
       <span className="mx-auto grid size-14 place-items-center rounded-full bg-success-lighter text-success-base"><RiCheckLine className="size-8" /></span>
-      <div><div className="text-title-h5 text-text-strong-950">Wallet recovered</div><p className="mt-1 text-paragraph-sm text-text-sub-600">This device&apos;s passkey is now the only owner. The old passkey was revoked on-chain and can no longer sign. Same address, same balance.</p></div>
+      <div><div className="text-title-h4 text-text-strong-950">Wallet recovered</div><p className="mt-2 text-paragraph-md text-text-sub-600">This device&apos;s passkey is now the only owner. The old passkey was revoked on-chain and can no longer sign. Same address, same balance.</p></div>
       {session.finalizedTx && <a className="inline-flex items-center gap-1 text-label-sm text-primary-base hover:underline" target="_blank" href={`${EXPLORER}/tx/${session.finalizedTx}`}>Owner swap on BaseScan <RiExternalLinkLine className="size-4" /></a>}
       <div className="grid gap-2 sm:grid-cols-2">
         <Button.Root asChild><Link href="/wallet">Open wallet</Link></Button.Root>
@@ -320,7 +377,7 @@ function Ended({ tone, title, body, onRestart }: { tone: 'error' | 'warning'; ti
     <Panel>
       <div className="flex items-start gap-3">
         <RiCloseCircleFill className={cn('size-7 shrink-0', tone === 'error' ? 'text-error-base' : 'text-warning-base')} />
-        <div><div className="text-title-h6 text-text-strong-950">{title}</div><p className="mt-1 text-paragraph-sm text-text-sub-600">{body}</p></div>
+        <div><div className="text-title-h6 text-text-strong-950">{title}</div><p className="mt-2 text-paragraph-md text-text-sub-600">{body}</p></div>
       </div>
       <Button.Root variant="neutral" mode="stroke" className="w-full" onClick={onRestart}>Start over</Button.Root>
     </Panel>

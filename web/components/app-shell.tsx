@@ -23,13 +23,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { data: alerts } = useAlerts(5000, signedIn);
   const unread = (alerts ?? []).filter((a) => !a.read).length;
   const bare = pathname.startsWith('/backoffice');
+  const recovering = pathname.startsWith('/recover');
+  // The logged-out home and the recovery flow are full-bleed split screens, so they opt out of the centred content column.
+  const landing = (pathname === '/' && !signedIn) || recovering;
+  // Recovery is a focused flow with no app chrome (nav, inbox, account menu): even a logged-in session never looks "in" there; Back is the way out.
+  const nav = signedIn && !bare && !recovering;
 
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="sticky top-0 z-40 border-b border-stroke-soft-200 bg-bg-white-0/90 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-[1220px] items-center gap-6 px-4 lg:px-8">
+        <div className={cn('mx-auto flex h-16 items-center gap-6 px-4 lg:px-8', !landing && 'max-w-[1220px]')}>
           <Link href="/" className="flex shrink-0 items-center"><SqLogo product={bare ? 'Operations' : undefined} /></Link>
-          {!bare && signedIn && (
+          {nav && (
             <nav className="hidden flex-1 items-center gap-1 md:flex">
               {NAV.map((n) => {
                 const on = n.match(pathname);
@@ -42,15 +47,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </nav>
           )}
           <div className="ml-auto flex items-center gap-2">
-            {!bare && signedIn && <InboxBell on={pathname.startsWith('/inbox')} unread={unread} />}
-            {!bare && <AccountMenu />}
+            {nav && <InboxBell on={pathname.startsWith('/inbox')} unread={unread} />}
+            {!bare && !recovering && <AccountMenu />}
           </div>
         </div>
       </header>
 
-      <main className={cn('mx-auto w-full max-w-[1220px] flex-1 px-4 pt-6 lg:px-8 lg:pt-10', signedIn && !bare ? 'pb-28 md:pb-16' : 'pb-16')}>{children}</main>
+      <main className={cn(landing ? 'flex flex-1 flex-col bg-bg-white-0' : 'mx-auto w-full max-w-[1220px] flex-1 px-4 pt-6 lg:px-8 lg:pt-10', !landing && (nav ? 'pb-28 md:pb-16' : 'pb-16'))}>{children}</main>
 
-      {signedIn && !bare && (
+      {nav && (
         <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-stroke-soft-200 bg-bg-white-0/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden">
           <div className="grid grid-cols-4">
             {NAV.map((n) => {

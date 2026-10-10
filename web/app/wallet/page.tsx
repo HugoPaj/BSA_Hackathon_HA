@@ -12,7 +12,7 @@ import * as Alert from '@/components/ui/alert';
 import { RequireLogin } from '@/components/require-login';
 import { ActivityList } from '@/components/activity-list';
 import { RecoveryBanner } from '@/components/recovery-banner';
-import { ReplacedDeviceNotice } from '@/components/replaced-device';
+import { DeviceNotice } from '@/components/device-notice';
 import { FundSheet } from '@/components/fund-sheet';
 import { NoWallet } from '@/components/no-wallet';
 import { Bone, BoneCard, BoneRow, Skeleton } from '@/components/skeleton';
@@ -43,7 +43,7 @@ function WalletHome() {
   return (
     <div className="mx-auto grid max-w-[1080px] gap-6 lg:grid-cols-[1fr_340px]">
       <div className="min-w-0 space-y-6">
-        <ReplacedDeviceNotice wallet={wallet} />
+        <DeviceNotice wallet={wallet} />
         {state.recovery && <RecoveryBanner data={data} onChange={() => { refresh(); activity.refresh(); }} />}
         {!isOwner && <Alert.Root status="error" variant="lighter" size="large"><Alert.Icon />The owner on-chain differs from Swissquote&apos;s record. Refresh in a moment.</Alert.Root>}
 
