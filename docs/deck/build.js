@@ -268,11 +268,11 @@ async function build() {
     s.addNotes('A thief with the phone and the e-mail can pass the login, but cannot sign (the passkey needs user verification, checked on-chain) and has no passport to scan. Someone else\'s passport is refused by the passport guardian: it is not the document enrolled for this wallet. The owner\'s own stolen passport fails too: ReadID\'s live face check (iProov) must match the photo on the chip. Without that, Swissquote\'s guardian never signs. The owner is alerted the moment a recovery starts.');
   }
   {
-    const s = content('b-recover', 'Demo backup · recover', 'Lost your phone? Scan your passport', { section: 'Pitch', hidden: true, gallery: true });
+    const s = content('b-recover', 'Demo backup · recover', 'Recover with your passport', { section: 'Pitch', hidden: true, gallery: true });
     await phoneRow(s, [
       { file: '09c-recover-passport-start.png', cap: 'Scan the same passport' },
       { file: '09c-recover-pending.png', cap: 'Both approved, 3-day wait' },
-      { file: '09c-recover-done.png', cap: 'Recovered', hi: true },
+      { file: '09b-recover-7-done.png', cap: 'Recovered', hi: true },
     ]);
     s.addNotes('On a new device: log in, create a new passkey, start the recovery request. Scan the passport enrolled at sign-up in ReadID Ready and look into the camera. The passport guardian checks the chip is genuine, not cloned, the enrolled one, and that the face matches the chip photo; then it signs exactly this request (Guardian B) and signs a face-check attestation that Swissquote\'s guardian accepts (Guardian A). One scan, two approvals. Then the delay: 3 minutes in the demo, 3 days in production, with alerts on every channel. After it, the new passkey owns the same wallet, same address, same balance.');
   }
@@ -376,7 +376,7 @@ async function build() {
     const s = content('arch', 'Architecture', 'What talks to what', { section: 'Pitch' });
     const colX = [MX, 3.77, 6.94, 10.11], colW = [2.55, 2.55, 2.55, W - MX - 10.11];
     const rowY = [2.72, 3.8, 4.88, 5.96], nh = 0.86;
-    const heads = ['YOUR DEVICES', 'SWISSQUOTE BACKEND', 'SEPARATE SERVICES · OWN KEYS', 'BASE SEPOLIA · ON-CHAIN'];
+    const heads = ['YOUR DEVICES', 'SWISSQUOTE BACKEND', 'SEPARATE SERVICES', 'BASE SEPOLIA · ON-CHAIN'];
     for (const [c, h] of heads.entries()) {
       box(s, colX[c] - 0.1, 2.2, colW[c] + 0.2, 4.78, { fill: c === 3 ? GREEN50 : WEAK, r: 0.16, name: 'Column: ' + h });
       text(s, h, { x: colX[c] + 0.04, y: 2.3, w: colW[c], h: 0.3, fontSize: 10.5, fontFace: MED, color: c === 3 ? GREEN : INK2, charSpacing: 1.5 });
@@ -457,10 +457,10 @@ async function build() {
 
   // 5e ── Recovery ──
   {
-    const s = content('recovery', 'Recovery', 'Lost your phone? Scan your passport', { section: 'Pitch' });
+    const s = content('recovery', 'Recovery · lost phone', 'Recover with your passport', { section: 'Pitch' });
     const steps = [
       ['RiSmartphoneLine', 'New phone', 'Log in, new passkey'],
-      ['RiPassportLine', 'Scan your passport', 'Chip genuine, not cloned'],
+      ['RiPassportLine', 'Scan passport', 'Chip genuine, not cloned'],
       ['RiUserFollowLine', 'Live face check', 'Your face matches the chip'],
       ['RiShieldCheckLine', 'Two approvals', 'Passport guardian + Swissquote'],
       ['RiTimerLine', '3-day wait', 'Alerts. One tap to cancel'],
@@ -479,7 +479,7 @@ async function build() {
     box(s, bx, byy, bw, 0.36, { fill: OR50, r: 0.18 });
     text(s, 'One scan: it approves as your backup and as Swissquote\'s face check', { x: bx, y: byy, w: bw, h: 0.36, align: 'center', valign: 'middle', fontSize: 12.5, fontFace: MED, color: OR7 });
     // Who stops the attacker; who is involved and how long.
-    const cy = 5.05, ch = 1.75, cw = (CW - 0.35) / 2;
+    const cy = 5.2, ch = 1.45, cw = (CW - 0.35) / 2;
     box(s, MX, cy, cw, ch, { fill: RED50, name: 'Attacker' });
     await status(s, MX + 0.3, cy + 0.3, 'no', 0.55);
     text(s, [{ text: 'Thief with your phone and e-mail', options: { fontFace: MED, fontSize: 17, breakLine: true } }, { text: 'No passport to scan. Someone else\'s is refused. Yours, stolen, fails the live face check.', options: { fontSize: 14, color: INK2 } }], { x: MX + 1.05, y: cy + 0.25, w: cw - 1.3, h: 1.35 });
@@ -574,51 +574,22 @@ async function build() {
     const hero = await sharp(path.join(ROOT, 'web/public/landing/hero.webp')).resize(900, 1200, { fit: 'cover', position: 'top' }).png().toBuffer();
     const framed = await sharp(hero).ensureAlpha().composite([{ input: roundMask(900, 1200, 60), blend: 'dest-in' }]).png().toBuffer();
     s.addImage({ data: b64(framed), x: 8.35, y: 0.75, w: 4.4, h: 5.87 });
-    s.addNotes('Repeat the one-liner. Then invite questions; the appendix after this slide has the architecture, threat model, model comparison, recovery rules, Guardian B options, Travel Rule, design decisions, real vs mocked, AI tools and limits.');
+    s.addNotes('Repeat the one-liner. Then invite questions; the appendix after this slide has the threat model in detail, the model comparison, the on-chain recovery rules, the Guardian B options, the Travel Rule, the technical calls, real vs mocked, AI tools and limits.');
   }
 
   // ═══ APPENDIX (Q&A) ═══════════════════════════════════════════════════
   pres.addSection({ title: 'Appendix' });
   const A = 'Appendix';
 
-  // A1 ── Architecture ──
-  {
-    const s = content('a-arch', 'Appendix · architecture', 'What talks to what', { section: A });
-    const cols = [
-      { x: MX, w: 2.35, h: 'Your devices', tag: 'REAL', items: [['RiFingerprintLine', 'Passkey'], ['RiComputerLine', 'Wallet web app'], ['RiIdCardLine', 'ID card app']] },
-      { x: 3.2, w: 2.35, h: 'Swissquote app', tag: 'MOCK', items: [['RiBankLine', 'E-banking login'], ['RiFilter3Line', 'Gas policy'], ['RiFileShield2Line', 'Proofs, alerts']] },
-      { x: 5.8, w: 2.35, h: 'Own servers', tag: 'MOCK', items: [['RiShieldUserLine', 'Swissquote guardian'], ['RiUserStarLine', 'Partner guardian'], ['RiEyeLine', 'Face check vendor']] },
-      { x: 8.4, w: 1.85, h: 'Infra', tag: 'REAL', items: [['RiStackLine', 'Bundler'], ['RiGasStationLine', 'Paymaster']] },
-      { x: 10.5, w: W - MX - 10.5, h: 'Base Sepolia', tag: 'REAL', items: [['RiSafe2Line', 'Your Safe'], ['RiLifebuoyLine', 'Recovery module'], ['RiTeamLine', 'Guardian Safe'], ['RiCoinsLine', 'USDC']] },
-    ];
-    const top = Y0 - 0.1, zh = 4.4;
-    for (const c of cols) {
-      const mock = c.tag === 'MOCK';
-      box(s, c.x, top, c.w, zh, { fill: mock ? YEL50 : APP, r: 0.18, name: c.h });
-      text(s, c.h, { x: c.x + 0.18, y: top + 0.18, w: c.w - 0.3, h: 0.35, fontSize: 15, fontFace: MED });
-      pill(s, c.x + 0.18, top + 0.58, c.tag, { fill: mock ? YEL200 : GREEN50, color: mock ? YELD : GREEN, fontSize: 9, h: 0.26, w: 0.66 });
-      const n = c.items.length, iy = top + 1.05, gap = 0.12, ih = (zh - 1.05 - 0.18 - gap * (n - 1)) / n;
-      for (const [j, [ic, l]] of c.items.entries()) {
-        const y = iy + j * (ih + gap);
-        box(s, c.x + 0.14, y, c.w - 0.28, ih, { fill: 'FFFFFF', line: HAIR, r: 0.12 });
-        await chip(s, c.x + 0.26, y + (ih - 0.42) / 2, ic, { s: 0.42 });
-        text(s, l, { x: c.x + 0.8, y, w: c.w - 0.95, h: ih, valign: 'middle', fontSize: 12.5, fontFace: MED });
-      }
-    }
-    for (const [a, b] of [[2.95, 3.2], [5.55, 5.8], [8.15, 8.4], [10.25, 10.5]]) arrow(s, a + 0.02, top + 2.4, b - 0.02, top + 2.4, OR, 1.75);
-    text(s, 'Guardians and the face-check vendor run as separate processes with their own storage. The web app holds no guardian key.', { x: MX, y: 6.6, w: CW, h: 0.35, fontSize: 13, color: INK2 });
-    s.addNotes('Green zones are real; yellow zones are mocked and labelled MOCK in the UI. The passkey signs a UserOperation; Swissquote\'s policy decides only whether to pay gas; the bundler lands it; the Safe verifies the passkey on-chain. For recovery the backend only relays evidence: each guardian process re-checks the chain and the vendor-signed face-match verdict itself before signing. In production the guardians and the vendor run as a separate Vercel project with their own Neon database; the web app never receives that database URL. Real: WebAuthn P-256, Safe v1.4.1, Safe4337Module v0.3.0, EntryPoint v0.7, Candide Social Recovery Module, Guardian A as a 1-of-2 Safe via EIP-1271, RsaGuardian, Candide bundler and paymaster, USDC. Mocked: e-banking login, face analysis, HSMs (software keys in separate processes), sanctions list (one real OFAC address), partner video ID, fiat funding (treasury Safe with test USDC), push and e-mail delivery.');
-  }
-
   // A2 ── Threat model ──
   {
     const s = content('a-threats', 'Appendix · threat model', 'Who could steal, who could lock you out', { section: A });
     const tiles = [
       ['RiSmartphoneLine', 'Stolen phone', 'no', 'Passkey needs unlock'],
-      ['RiMailLine', 'Phone + e-mail', 'no', 'Face check + factor'],
+      ['RiMailLine', 'Phone + e-mail', 'no', 'No passport, no face'],
       ['RiServerLine', 'Swissquote hacked', 'no', 'Holds no spending key'],
       ['RiTeamLine', 'Swissquote + partner', 'no', 'Only one guardian vote'],
-      ['RiIdCardLine', 'Insider + stolen ID', 'wait', 'Stopped if you cancel'],
+      ['RiPassportLine', 'Stolen passport', 'wait', 'Face must match, then you cancel'],
       ['RiCloudOffLine', 'Swissquote gone', 'yes', 'Rescue page + partner'],
       ['RiLockPasswordLine', 'Phone + its PIN', 'wait', 'Residual: owner-level access'],
       ['RiQuestionLine', 'You lose everything', 'wait', 'Locked out, by design'],
@@ -632,7 +603,7 @@ async function build() {
       text(s, h, { x: x + 0.25, y: y + 0.95, w: tw - 0.5, h: 0.4, fontSize: 17, fontFace: MED });
       text(s, b, { x: x + 0.25, y: y + 1.35, w: tw - 0.5, h: 0.5, fontSize: 14, color: INK2 });
     }
-    s.addNotes('Stolen locked phone: blocked, every payment needs the passkey, which needs the device unlock; user verification is checked on-chain. Phone + e-mail (SIM swap): blocked, Swissquote approves only after a live face match against the KYC photo, and Guardian B is not on the phone. Swissquote insider or hacked backend: blocked, no spending key, no guardian key in the backend, vendor-signed face verdicts. Swissquote + partner colluding: blocked, one guardian slot. Insider + stolen backup method: only if the client ignores the 3-day alerts. Swissquote gone: client unaffected. Phone + device PIN: residual, the attacker is the owner; the answer is an opt-in on-chain delay for large transfers in production. Client loses passkey and factor: locked out, the price of Swissquote never recovering alone. Also residual: synced passkeys put the Apple or Google account in the trust base.');
+    s.addNotes('Stolen locked phone: blocked, every payment needs the passkey, which needs the device unlock; user verification is checked on-chain. Phone + e-mail (SIM swap): blocked, the passport is not on the phone, another passport is refused, and Swissquote approves only with a signed live face check bound to this request. Swissquote insider or hacked backend: blocked, no spending key, no guardian key in the backend, face checks signed by ReadID\'s passport guardian or the vendor. Swissquote + partner colluding: blocked, one guardian slot. Stolen passport (with an insider): the holder\'s live face must match the chip photo, and even then only if the client ignores the 3-day alerts. Swissquote gone: client unaffected. Phone + device PIN: residual, the attacker is the owner; the answer is an opt-in on-chain delay for large transfers in production. Client loses passkey and backup: locked out, the price of Swissquote never recovering alone. Also residual: synced passkeys put the Apple or Google account in the trust base, and Signicat is trusted for the passport check (recovery only).');
   }
 
   // A3 ── Why this model ──
@@ -656,7 +627,7 @@ async function build() {
     box(s, MX, Y0 + 2.85, CW, 1.4, { fill: APP, name: 'Bitcoin' });
     await chip(s, MX + 0.3, Y0 + 3.2, 'RiBitCoinLine', { s: 0.7, fill: 'FFFFFF' });
     text(s, [{ text: 'EVM-only? What about Bitcoin?  ', options: { fontFace: MED } }, { text: 'Wrapped BTC sits in the same Safe today. Native BTC next: a Taproot vault, your key spends, guardians only after a timelock.', options: { color: INK2 } }], { x: MX + 1.25, y: Y0 + 2.85, w: CW - 1.55, h: 1.4, valign: 'middle', fontSize: 16 });
-    s.addNotes('Seed phrase: a typical Swissquote client will not keep 24 words safe. MPC with a Swissquote share: signs for any chain, Bitcoin included, but a bank share inside every signature looks like power of disposal to FINMA. Shamir/SLIP-39: the seed is reassembled in one place at recovery time, and Swissquote + partner could rebuild it without the client. Our model separates spending (client only) from recovery (guardians, with the client\'s factor, after a delay) and replaces the key instead of rebuilding it. The trade: EVM chains only. For Bitcoin the same policy fits in a Taproot script with a timelocked recovery path; the client device holds a secp256k1 key because Bitcoin cannot verify a passkey. Not built.');
+    s.addNotes('Seed phrase: a typical Swissquote client will not keep 24 words safe. MPC with a Swissquote share: signs for any chain, Bitcoin included, but a bank share inside every signature looks like power of disposal to FINMA. Shamir/SLIP-39: the seed is reassembled in one place at recovery time, and Swissquote + partner could rebuild it without the client. Our model separates spending (client only) from recovery (guardians, with the client\'s own backup, after a delay) and replaces the key instead of rebuilding it. The trade: EVM chains only. For Bitcoin the same policy fits in a Taproot script with a timelocked recovery path; the client device holds a secp256k1 key because Bitcoin cannot verify a passkey. Not built.');
   }
 
   // A4 ── Recovery rules ──
@@ -669,9 +640,9 @@ async function build() {
       await chip(s, x + 0.3, gy + 0.75, ic, { s: 1.0, round: true, fill: 'FFFFFF' });
       text(s, [{ text: l1, options: { fontFace: MED, fontSize: 19, breakLine: true } }, { text: l2, options: { fontSize: 15, color: INK2 } }], { x: x + 0.3, y: gy + 1.95, w: 2.8, h: 1.1 });
     };
-    await slot(MX, 'GUARDIAN A', 'RiBankLine', 'Swissquote or partner', 'After a live face check');
+    await slot(MX, 'GUARDIAN A', 'RiBankLine', 'Swissquote or partner', 'After a signed live face check');
     text(s, '+', { x: MX + 3.3, y: gy, w: 0.7, h: 3.2, align: 'center', valign: 'middle', fontSize: 44, bold: true, color: OR });
-    await slot(MX + 4.0, 'GUARDIAN B', 'RiShieldKeyholeLine', 'Your backup method', 'ID card, passphrase or another passkey');
+    await slot(MX + 4.0, 'GUARDIAN B', 'RiPassportLine', 'Your passport', 'Or another passkey, or a recovery card');
     arrow(s, MX + 7.4, gy + 1.6, MX + 7.95, gy + 1.6, OR, 2.5);
     const rx = MX + 8.05, rw = W - MX - rx;
     box(s, rx, gy, rw, 1.5, { fill: YEL50, line: YEL200, name: 'Delay' });
@@ -681,21 +652,21 @@ async function build() {
     await chip(s, rx + 0.3, gy + 2.1, 'RiCheckLine', { s: 0.7, round: true, fill: 'FFFFFF', color: GREEN });
     text(s, [{ text: 'New passkey owns it', options: { fontFace: MED, fontSize: 19, breakLine: true } }, { text: 'Same address. Old key dead', options: { fontSize: 15, color: INK2 } }], { x: rx + 1.2, y: gy + 1.95, w: rw - 1.35, h: 1.0, valign: 'middle' });
     text(s, 'About 5 minutes of client effort, then the delay. Never one party alone.', { x: MX, y: gy + 3.6, w: CW, h: 0.4, fontSize: 16, color: INK2 });
-    s.addNotes('Recovery never rebuilds the old key; it asks the Safe to swap the owner to a new passkey. Candide\'s Social Recovery Module, threshold 2 of 2: Guardian A is a 1-of-2 Safe owned by Swissquote\'s guardian (signs after e-banking login and a live face match against the KYC photo, verdict signed by a separate vendor) and the independent partner (video identification; works if Swissquote is gone). Guardian B is the client\'s choice of three: ID card, a recovery passphrase (printable, locked with a PIN), or a passkey on another device or held by someone they trust. Then 3 days (3 minutes in the demo) with alerts; any device with the passkey can cancel. After it, the old passkey is rejected on-chain (AA24).');
+    s.addNotes('Recovery never rebuilds the old key; it asks the Safe to swap the owner to a new passkey. Candide\'s Social Recovery Module, threshold 2 of 2: Guardian A is a 1-of-2 Safe owned by Swissquote\'s guardian (signs after e-banking login and a signed live face check bound to this request: from the passport scan, or from the face-check vendor against the KYC photo) and the independent partner (video identification; works if Swissquote is gone). Guardian B is the client\'s choice of three: the passport guardian (a key per wallet, used only after a scan of the enrolled passport), a passkey on another device or held by someone they trust, or a printable recovery card locked with a 6-digit PIN. Then 3 days (3 minutes in the demo) with alerts; any device with the passkey can cancel. After it, the old passkey is rejected on-chain (AA24).');
   }
 
   // A5 ── Guardian B options ──
   {
     const s = content('a-guardian-b', 'Appendix · design decision', 'Guardian B: your choice of three', { section: A, app: true });
     await points(s, [
-      ['RiIdCardLine', 'ID card', 'Tap it on an Android phone, PIN-protected'],
-      ['RiKey2Line', 'Recovery passphrase', 'Printable, locked with a PIN, offline'],
-      ['RiUserSharedLine', 'Another passkey', 'Laptop, 2nd phone or a trusted person'],
+      ['RiPassportLine', 'Passport or ID card', 'Scan the chip in ReadID Ready, plus a live face check'],
+      ['RiUserSharedLine', 'Another passkey', 'Laptop, 2nd phone, security key or a trusted person'],
+      ['RiQrCodeLine', 'Recovery card', 'Printable code, locked with a PIN, offline'],
     ], { y: Y0 + 0.1, w: 5.8, gap: 0.45, icon: 0.8 });
-    text(s, 'Only for recovery. Payments need your passkey alone.', { x: MX, y: Y0 + 4.2, w: 5.8, h: 0.4, fontSize: 16, color: INK2 });
-    await phone(s, '09b-recover-4-guardian-b.png', { cx: 8.6, cy: 4.5, h: 4.9, deg: -6 });
-    await phone(s, '03d-backup-method-v2.png', { cx: 10.95, cy: 4.4, h: 5.4 });
-    s.addNotes('Guardian B is always the client\'s own factor, and the client picks it at sign-up: an NFC ID card, a recovery passphrase (a printable code locked with a 6-digit PIN, kept offline), or a passkey on another device, which can be their own laptop, a second phone, a security key, or a person they trust. It is used only to approve a recovery, never a payment: payments are approved by the wallet\'s passkey alone.\n\nWhy offer the ID card: nearly everyone carries an NFC ID card with a PIN-protected signing key (Spanish DNIe: RSA-2048), so it needs no extra device and no paper. The card signs the recovery hash over NFC in a small Android app ("Swissquote ID"), because no browser can speak ISO-DEP NFC. A per-wallet RsaGuardian contract, deployed in the wallet\'s first transaction, verifies it as an EIP-1271 guardian using the EVM\'s modexp and SHA-256 precompiles. It is our only custom contract, about 50 lines, holds no funds and only answers "is this signature valid?". Honest status: the demo uses a simulated card, NFC is untested with a physical card, no iOS app, and the rescue page does not support the ID card yet (it supports the other passkey and the passphrase).');
+    text(s, 'Only for recovery. Payments need your passkey.', { x: MX, y: Y0 + 4.2, w: 5.8, h: 0.4, fontSize: 16, color: INK2 });
+    await phone(s, '09c-recover-passport-start.png', { cx: 8.6, cy: 4.5, h: 4.9, deg: -6 });
+    await phone(s, '03f-backup-passport.png', { cx: 10.95, cy: 4.4, h: 5.4 });
+    s.addNotes('Guardian B is always the client\'s own backup, and the client picks it at sign-up. Recommended: a passport or national ID card with a chip (any ICAO document), scanned with Signicat\'s free ReadID Ready app on iPhone or Android. Or a passkey on another device: their laptop, a second phone, a security key, or a person they trust. Or a recovery card: a printable code locked with a 6-digit PIN, kept offline. It is used only to approve a recovery, never a payment.\n\nHow the passport works: a passport chip cannot sign our recovery request (Active Authentication only signs a random challenge the reader picks), so a separate passport guardian service holds a key for each wallet and lends it to the passport. At sign-up it records the document number and country; at recovery it computes the request from the chain itself, opens a ReadID session, fetches the result from Signicat (never from the browser), and signs only if the chip is genuine (Passive Authentication), not a clone (Active or Chip Authentication), the enrolled document, and the holder passed iProov\'s live face check against the chip photo. From the same scan it signs a liveness attestation that Swissquote\'s guardian accepts, so the client does one scan instead of two checks. Its signature does nothing without Guardian A. A renewed passport has a new number, so it must be enrolled again. Without Signicat credentials the service runs simulated (local dev); the hosted demo uses real ReadID.');
   }
 
   // A6 ── Travel Rule ──
@@ -724,30 +695,32 @@ async function build() {
   {
     const s = content('a-decisions', 'Appendix · technical decisions', 'The technical calls', { section: A });
     const tiles = [
-      ['RiShieldCheckLine', 'Recovery in the first transaction', 'No funded wallet without recovery'],
-      ['RiEyeLine', 'Vendor-signed face check', 'A hacked backend can\'t fake it'],
-      ['RiServerLine', 'Guardians as separate services', 'Own project, own database'],
+      ['RiShieldCheckLine', 'Recovery from day one', 'No funded wallet without recovery'],
+      ['RiEyeLine', 'Signed face checks', 'A hacked backend can\'t fake them'],
+      ['RiServerLine', 'Separate guardians', 'Own project, own database'],
+      ['RiKey2Line', 'Passport guardian', 'A chip can\'t sign our request'],
+      ['RiPassportLine', 'ReadID Ready', 'No app of our own. iPhone and Android'],
       ['RiFlashlightLine', 'Base Sepolia', 'P-256 precompile: cheap passkey checks'],
-      ['RiStackLine', 'Safe + Candide modules', 'Audited, no homemade crypto'],
+      ['RiStackLine', 'Safe + Candide', 'Audited, no homemade crypto'],
       ['RiComputerLine', 'Web app, not native', 'Passkeys follow you across devices'],
     ];
-    const cols = 3, gap = 0.3, tw = (CW - (cols - 1) * gap) / cols, th = 2.0;
+    const cols = 4, gap = 0.3, tw = (CW - (cols - 1) * gap) / cols, th = 2.0;
     for (const [i, [ic, h, b]] of tiles.entries()) {
       const x = MX + (i % cols) * (tw + gap), y = Y0 + Math.floor(i / cols) * (th + 0.3);
       box(s, x, y, tw, th, { name: h });
       await chip(s, x + 0.25, y + 0.25, ic, { s: 0.6 });
-      text(s, h, { x: x + 0.25, y: y + 1.0, w: tw - 0.45, h: 0.4, fontSize: 17, fontFace: MED });
-      text(s, b, { x: x + 0.25, y: y + 1.42, w: tw - 0.45, h: 0.45, fontSize: 14, color: INK2 });
+      text(s, h, { x: x + 0.25, y: y + 0.95, w: tw - 0.45, h: 0.5, fontSize: 16, fontFace: MED });
+      text(s, b, { x: x + 0.25, y: y + 1.42, w: tw - 0.45, h: 0.5, fontSize: 13, color: INK2 });
     }
-    s.addNotes('Recovery is enabled in the wallet\'s first transaction, so no money can arrive before recovery exists (caught by our adversarial review). The face-check vendor signs its verdict, bound to the request, fresh and single-use, so a compromised Swissquote backend cannot fake a face match. The guardians and the vendor run as separate services with their own storage (a separate Vercel project and Neon database), per the brief\'s hard rule. Base for the RIP-7212 P-256 precompile, which makes on-chain passkey checks cheap. Safe v1.4.1 with the Safe4337Module and Candide\'s Social Recovery Module, via Candide abstractionkit because permissionless.js does not support passkey Safes. A responsive web app instead of native: passkeys sync across devices on one origin.');
+    s.addNotes('Recovery is enabled in the wallet\'s first transaction, so no money can arrive before recovery exists (caught by our adversarial review). Face checks are signed attestations bound to the exact recovery request, fresh and single-use, from issuers whose keys Swissquote\'s guardian pins: the passport guardian (ReadID and iProov) or the face-check vendor. A compromised Swissquote backend cannot fake one. The guardians run as separate services with their own storage (a separate Vercel project and Neon database), per the brief\'s hard rule. A passport chip only signs reader challenges, so the passport guardian holds one key per wallet (wallets cannot be linked on-chain) and signs only after a matching scan. ReadID Ready replaced our own Android NFC app: it works on iPhone too and adds clone detection and the live face check. Base for the RIP-7212 P-256 precompile, which makes on-chain passkey checks cheap. Safe v1.4.1 with the Safe4337Module and Candide\'s Social Recovery Module, via Candide abstractionkit because permissionless.js does not support passkey Safes. A responsive web app instead of native: passkeys sync across devices on one origin.');
   }
 
   // A8 ── Real vs mocked, tests ──
   {
     const s = content('a-real', 'Appendix · technical implementation', 'Honest mocks. Tested end to end', { section: A, app: true });
-    await laptop(s, '11b-backoffice-audit-desktop.png', { cx: MX + 3.45, cy: 4.6, w: 6.9 });
+    await laptop(s, '11c-backoffice-audit-passport.png', { cx: MX + 3.45, cy: 4.6, w: 6.9 });
     const x = 7.95, w = W - MX - x;
-    const groups = [['REAL', GREEN50, GREEN, ['Passkeys, verified on-chain', 'Safe, ERC-4337, recovery module', 'Gas sponsorship, USDC']], ['MOCK', YEL200, YELD, ['Login, face analysis, HSMs', 'Sanctions list, fiat funding']], ['TESTED', OR50, OR7, ['Create, sign, recover in a real browser', 'Forged face verdicts, attackers']]];
+    const groups = [['REAL', GREEN50, GREEN, ['Passkeys, verified on-chain', 'Safe, ERC-4337, recovery module', 'Passport scan: ReadID, iProov', 'Gas sponsorship, USDC']], ['MOCK', YEL200, YELD, ['Login, HSMs, partner video ID', 'Sanctions list, fiat funding']], ['TESTED', OR50, OR7, ['Create, sign, recover in a real browser', 'Wrong passport, forged verdicts']]];
     let y = Y0 - 0.1;
     for (const [tag, f, c, items] of groups) {
       pill(s, x, y, tag, { fill: f, color: c, fontSize: 10, h: 0.3, w: 0.95 });
@@ -755,14 +728,14 @@ async function build() {
       for (const it of items) { text(s, it, { x, y, w, h: 0.36, fontSize: 16 }); y += 0.38; }
       y += 0.25;
     }
-    s.addNotes('No homemade crypto: Safe, Candide, WebAuthn, viem; the ID card does its own RSA signing. Mocks follow the brief: each mocked share holder runs as its own process with its own key and storage, and the web backend never holds a guardian share. Tests: API + chain with software passkeys; the real UI in headless Chromium with a virtual WebAuthn authenticator, including the full recovery, the cancel banner and the old-passkey rejection; Swissquote-gone through the rescue page, checking it never contacts Swissquote; negative tests for forged, edited and replayed liveness verdicts and an ownership proof rewritten to another client.');
+    s.addNotes('The laptop shows the operations view\'s audit log for one run: a thief\'s scan of another passport refused by the passport guardian, then the owner\'s scan, the passport guardian\'s signature and face-check attestation, Swissquote\'s guardian pinning that key and signing, and the recovery submitted on-chain. (Screens were captured on a local copy, where the passport is simulated; the hosted demo uses real ReadID.)\n\nNo homemade crypto: Safe, Candide, WebAuthn, viem; the passport chip checks are Signicat\'s. Mocks follow the brief: each mocked share holder runs as its own process with its own key and storage, and the web backend never holds a guardian share. Tests: API + chain with software passkeys; the real UI in headless Chromium with a virtual WebAuthn authenticator, including the full recovery, the cancel banner and the old-passkey rejection; the passport guardian on Base Sepolia (enrolment, refusal of another passport, signing, attestation, multiConfirmRecovery); Swissquote-gone through the rescue page, checking it never contacts Swissquote; negative tests for forged, edited and replayed liveness verdicts and an ownership proof rewritten to another client.');
   }
 
   // A9 ── AI tools ──
   {
     const s = content('a-ai', 'Appendix · AI tools', 'Which AI tools we used, and for what', { section: A });
     const cards = [
-      ['RiCodeSSlashLine', 'Claude Code', 'Pair-programmed the app, contracts, ID app and tests'],
+      ['RiCodeSSlashLine', 'Claude Code', 'Pair-programmed the app, guardian services and tests'],
       ['RiSpyLine', 'Codex and Claude', 'Two adversarial reviews of our plan'],
       ['RiUserLine', 'Us', 'Custody decisions, on-chain checks, legal framing'],
     ];
@@ -774,7 +747,7 @@ async function build() {
       text(s, h, { x: x + 0.35, y: Y0 + 1.5, w: cw - 0.7, h: 0.5, fontSize: 24, fontFace: MED });
       text(s, b, { x: x + 0.35, y: Y0 + 2.05, w: cw - 0.7, h: 1.2, fontSize: 17, color: INK2 });
     }
-    s.addNotes('Claude Code (Claude Opus) pair-programmed the web app, API, guardian services, the RsaGuardian contract, the Android ID app and the end-to-end and attack tests, set up Vercel and Neon, and extracted Swissquote\'s design tokens into design.md. OpenAI Codex and Claude wrote two independent adversarial reviews of our plan (docs/review-*.md); they found the shared-signer problem, the funded-before-deploy loss case and the phone + PIN gap, and flagged overstated legal claims, which changed the design. We made the custody decisions, proved SDK behaviour in a spike before any UI, checked every on-chain result on BaseScan, and marked legal points as not legal advice.');
+    s.addNotes('Claude Code (Claude Opus) pair-programmed the web app, API, guardian services (including the passport guardian and its Signicat ReadID integration) and the end-to-end and attack tests, built this deck, set up Vercel and Neon, and extracted Swissquote\'s design tokens into design.md. OpenAI Codex and Claude wrote two independent adversarial reviews of our plan (docs/review-*.md); they found the shared-signer problem, the funded-before-deploy loss case and the phone + PIN gap, and flagged overstated legal claims, which changed the design. We made the custody decisions, proved SDK behaviour in a spike before any UI, checked every on-chain result on BaseScan, and marked legal points as not legal advice.');
   }
 
   // A10 ── Limits ──
@@ -783,7 +756,7 @@ async function build() {
     const rows = [
       ['RiLockPasswordLine', 'Thief with phone and PIN', 'On-chain delay for large transfers'],
       ['RiCloudLine', 'Synced passkeys trust Apple, Google', 'Security keys for big balances'],
-      ['RiIdCardLine', 'ID card: simulated, Android only', 'Real-card test, iOS, rescue page'],
+      ['RiPassportLine', 'New passport, new enrolment', 'Prompt before it expires'],
       ['RiServerLine', 'Software keys, public paymaster', 'HSMs, private paymaster, rate limits'],
       ['RiScales3Line', 'Legal reasoning, not an opinion', 'Counsel and a FINMA conversation'],
     ];
@@ -796,7 +769,7 @@ async function build() {
       arrow(s, 6.45, y + 0.3, 6.95, y + 0.3, OR, 1.75);
       text(s, b, { x: 7.2, y, w: W - MX - 7.2, h: 0.6, valign: 'middle', fontSize: 18, color: INK2 });
     }
-    s.addNotes('We list residual risks openly. A thief with the unlocked phone and PIN is indistinguishable from the owner; the answer is an opt-in Safe Guard delaying large transfers that guardians can cancel. Synced passkeys put Apple or Google accounts in the trust base; a high-balance tier would require device-bound security keys. The delay protects only a client who reads alerts. Guardian addresses are public on-chain and could link a client to Swissquote. The ID card path is untested with a physical card, Android only, and not yet on the rescue page. Demo gas comes from a public unrestricted paymaster endpoint; production uses a private key and policy.');
+    s.addNotes('We list residual risks openly. A thief with the unlocked phone and PIN is indistinguishable from the owner; the answer is an opt-in Safe Guard delaying large transfers that guardians can cancel. Synced passkeys put Apple or Google accounts in the trust base; a high-balance tier would require device-bound security keys. The delay protects only a client who reads alerts. Guardian addresses are public on-chain and could link a client to Swissquote. A renewed passport has a new document number, so it must be enrolled again; the app should prompt before expiry and suggest a second backup. Signicat is in the trust base for passport recovery, and the passport guardian\'s key is a software key until it moves to an HSM. Demo gas comes from a public unrestricted paymaster endpoint; production uses a private key and policy.');
   }
 
   await pres.writeFile({ fileName: OUT });
