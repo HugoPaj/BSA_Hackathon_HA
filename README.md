@@ -7,6 +7,8 @@ Hackathon prototype for the Swissquote Wallet Challenge: a wallet a Swiss bank c
 - **Independent reviews of the plan:** [docs/review-codex.md](docs/review-codex.md), [docs/review-claude.md](docs/review-claude.md)
 - **App:** [`web/`](web), a Next.js 16 responsive website that works on phones and computers
 
+Live demo: www.swissquote-two.vercel.app
+
 ## What is real and what is mocked
 
 | Real, on Base Sepolia | Mocked, and labelled in the UI |
@@ -274,7 +276,6 @@ ERC-4337 is EVM-only, and we do not claim otherwise.
 | Claude Code with Claude Opus 5.5 (Anthropic) | Writing and refactoring most of the code: the Next.js app, the guardian, liveness and passport guardian services, the rescue page, the end-to-end test scripts, and the deck generator (`docs/deck/build.js`). Also used for these docs and for debugging through headless Chromium with a virtual WebAuthn authenticator. Several sessions ran in parallel on separate parts. Every commit is co-authored by it |
 | Claude (Anthropic) | Adversarial review of the plan, checking legal and vendor claims against primary sources: [docs/review-claude.md](docs/review-claude.md) |
 | Codex (OpenAI) | A second, independent adversarial review of the same plan: [docs/review-codex.md](docs/review-codex.md) |
-<!-- TODO: confirm the tool behind web/public/landing/hero.webp and recover.webp, and any other tools used -->
 
 We chose the architecture, the custody model and the legal position, then checked them against the two reviews. The legal claims marked **[verified]** in the Claude review were checked against the primary sources it cites.
 
