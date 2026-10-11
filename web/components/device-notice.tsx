@@ -1,26 +1,16 @@
 'use client';
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import * as Alert from '@/components/ui/alert';
-import { loadDevice, type DeviceRecord } from '@/lib/device';
+import { holdsPasskey, useDevice } from '@/lib/device';
 
 /**
  * Tells the client when this browser can read the wallet but not sign for it: either it never held the passkey
  * (logged in on a new device), or a recovery replaced its passkey with one on another device.
  */
 export function DeviceNotice({ wallet }: { wallet: { address: string; owner: { credentialId: string } } }) {
-  // undefined until localStorage is read, so the notice doesn't flash on devices that do hold the passkey.
-  const [device, setDevice] = useState<DeviceRecord | null | undefined>(undefined);
-  useEffect(() => {
-    const load = () => setDevice(loadDevice());
-    load();
-    window.addEventListener('sq-device', load);
-    window.addEventListener('storage', load);
-    return () => { window.removeEventListener('sq-device', load); window.removeEventListener('storage', load); };
-  }, []);
-  if (device === undefined) return null;
+  const device = useDevice();
+  if (device === undefined || holdsPasskey(device, wallet)) return null;
   const sameWallet = !!device && device.wallet.toLowerCase() === wallet.address.toLowerCase();
-  if (sameWallet && device.owner.credentialId === wallet.owner.credentialId) return null;
   if (sameWallet) {
     return (
       <Alert.Root status="warning" variant="lighter" size="large">
