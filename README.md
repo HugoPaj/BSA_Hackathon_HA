@@ -7,7 +7,7 @@ Hackathon prototype for the Swissquote Wallet Challenge: a wallet a Swiss bank c
 - **Independent reviews of the plan:** [docs/review-codex.md](docs/review-codex.md), [docs/review-claude.md](docs/review-claude.md)
 - **App:** [`web/`](web), a Next.js 16 responsive website that works on phones and computers
 
-Live demo: www.swissquote-two.vercel.app
+Live demo: swissquote-two.vercel.app
 
 ## What is real and what is mocked
 
