@@ -21,6 +21,7 @@ import { scrollToTop } from '@/components/app-shell';
 import { createPasskey, passkeysSupported, signWithPasskey, hexToBytes, type Passkey } from '@/lib/passkey';
 import { createRecoveryCard } from '@/lib/card';
 import { counterfactualAddress, passkeySignerAddress, setupTransactions, Safe, type GuardianB } from '@/lib/chain';
+import { verifyGuardianA, verifyPassportEnrollment } from '@/lib/guardian-keys';
 import { PassportScan, passportGuardian, pendingScan, type ScanStart } from '@/components/passport-scan';
 import { useTxFlow, friendly } from '@/lib/use-tx-flow';
 import { api } from '@/lib/api';
@@ -188,7 +189,11 @@ function FactorStep({ owner, wallet, factor, setFactor, onNext }: { owner: Passk
             purpose="enroll"
             context={owner}
             start={(callback) => passportGuardian<ScanStart>('/enroll', { wallet, callback })}
-            onDone={(s) => { const e = s.enrollment!; setFactor({ type: 'passport', enrollId: e.id, address: e.address, simulated: e.simulated, label: e.label }); }}
+            onDone={async (s) => {
+              const e = s.enrollment!;
+              await verifyPassportEnrollment({ enrollment: e.id, wallet: e.wallet, guardian: e.address }, e.certificate, wallet);
+              setFactor({ type: 'passport', enrollId: e.id, address: e.address, simulated: e.simulated, label: e.label });
+            }}
           />
         </div>
       )}
@@ -311,7 +316,8 @@ function CreateStep({ owner, factor, bankAssisted, contact, onNext }: { owner: P
     try {
       const { swissquoteGuardian } = await api<{ swissquoteGuardian: string }>('/api/config');
       await api('/api/wallet', { owner, guardianB: factor, bankAssisted, contact: bankAssisted ? undefined : contact });
-      const guardianA = bankAssisted ? swissquoteGuardian : contact;
+      // Never take Swissquote's guardian from the server alone: it must be the Safe of the keys built into this app.
+      const guardianA = bankAssisted ? verifyGuardianA(swissquoteGuardian) : contact;
       await flow.prepare(setupTransactions(address, guardianA, factor), { type: 'deploy', title: 'Wallet created, recovery switched on' });
     } catch (e) { setPrepError(friendly(e)); }
   };
@@ -339,7 +345,7 @@ function CreateStep({ owner, factor, bankAssisted, contact, onNext }: { owner: P
         {[
           ['Wallet address', <span key="a" className="font-mono text-paragraph-xs">{shortAddress(address)}</span>],
           ['Payment approval', 'Your passkey'],
-          ['Recovery support', bankAssisted ? 'Swissquote' : 'Trusted contact'],
+          ['Recovery support', bankAssisted ? <span key="g" className="inline-flex items-center gap-1">Swissquote<RiShieldCheckFill className="size-4 text-success-base" /></span> : 'Trusted contact'],
           ['Backup method', factor.label],
           ['Recovery approvals', 'Both required'],
           ['Safety delay', `${RECOVERY_DELAY_LABEL} in this demo`],
@@ -368,6 +374,7 @@ function CreateStep({ owner, factor, bankAssisted, contact, onNext }: { owner: P
       )}
       <TechnicalDetails>
         <p>A single transaction deploys your Safe smart account, makes your passkey signer contract its only owner and enables recovery. Your recovery support and backup are registered as Guardian A and Guardian B; both approvals are required.</p>
+        <p>Before you sign, this app checks the guardians against keys built into it, never against what the server says alone.{bankAssisted && ' Guardian A must be the Safe of the Swissquote and partner keys Swissquote publishes.'}{factor.type === 'passport' && ' Your passport backup must be certified by the passport guardian\'s published key.'} If anything else is proposed, wallet creation stops.</p>
       </TechnicalDetails>
     </Card>
   );

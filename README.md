@@ -24,11 +24,18 @@ Hackathon prototype for the Swissquote Wallet Challenge: a wallet a Swiss bank c
 
 **Liveness is mocked, but its verdict cannot be faked by Swissquote's backend.** The vendor is a separate process with its own key. It signs an EIP-712 attestation bound to the client, the wallet and the exact recovery request (new owner and nonce). Swissquote's guardian accepts it only if all of these hold:
 
-- it is signed by the pinned vendor key;
+- it is signed by the configured vendor key;
 - it is fresh (10 minutes) and has not been used before;
 - its client matches the KYC file named in the wallet owner's own passkey-signed ownership proof, which the guardian re-checks on-chain (EIP-1271).
 
-The web backend only relays this evidence. A compromised backend that holds a valid Guardian B signature still cannot get Swissquote's approval. The tests cover a forged verdict, an edited verdict, a verdict for another request, and an ownership proof rewritten to another client. Only the face analysis itself is mocked: the demo chooses the outcome. Wallets backed by a passport skip this mock: the passport guardian signs the same attestation from ReadID's live face check against the chip photo, and Swissquote's guardian pins its key too.
+The web backend only relays this evidence. A compromised backend that holds a valid Guardian B signature still cannot get Swissquote's approval. The tests cover a forged verdict, an edited verdict, a verdict for another request, and an ownership proof rewritten to another client. Only the face analysis itself is mocked: the demo chooses the outcome. Wallets backed by a passport skip this mock: the passport guardian signs the same attestation from ReadID's live face check against the chip photo, and Swissquote's guardian trusts its configured key too.
+
+**The browser checks that Swissquote's guardian really is Swissquote's.** The guardians' public keys are built into the app (`NEXT_PUBLIC_SQ_GUARDIAN_KEY`, `NEXT_PUBLIC_PARTNER_GUARDIAN_KEY`, `NEXT_PUBLIC_PASSPORT_GUARDIAN_KEY`; `npm run dev` reads them from the services) and published at [`/.well-known/swissquote-guardians.json`](https://swissquote-two.vercel.app/.well-known/swissquote-guardians.json). Before the owner's passkey signs the setup transaction, the browser:
+
+- computes the Guardian A Safe address from the two published keys (CREATE2 with a fixed proxy bytecode, no RPC involved) and stops if the server proposed any other address;
+- for a passport backup, checks that the published passport guardian key signed an EIP-712 certificate for that wallet's enrolment key. The guardian derives one key per enrolment, so that key cannot be published itself.
+
+The security page marks Guardian A as matching the published keys, or *Unverified* if it does not. The backend checks the guardian services' `/info` against the same keys. Swissquote's guardian only trusts the liveness and passport issuer keys its operator configures (`LIVENESS_VENDOR`, `PASSPORT_ATTESTOR`), never a key read from the issuer's own endpoint. So a compromised or impersonated Swissquote backend cannot register a guardian of its own. In production, the keys would ship in the signed app binary and on swissquote.com. Each HSM key would also come with the HSM maker's attestation that it was generated inside the HSM and cannot leave it. `scripts/e2e-rogue-guardian.mjs` tests both refusals.
 
 No API key or testnet ETH is needed. Candide's public Base Sepolia endpoint provides the bundler and sponsors gas.
 
@@ -68,6 +75,7 @@ node scripts/e2e-ui.mjs --recover     # ...plus the full recovery, the cancel ba
 npx tsx scripts/e2e-rescue.mts        # Swissquote gone: send via public bundler, attacker refusals, card + partner recovery (~4 min)
 npx tsx scripts/e2e-rescue-ui.mts     # ...the same through the rescue page in headless Chromium, checking it never contacts Swissquote
 npx tsx scripts/e2e-passport-chain.mts # passport guardian (simulated): enrol, refuse another passport, sign, multiConfirmRecovery on-chain
+node scripts/e2e-rogue-guardian.mjs   # a compromised backend proposes its own Guardian A, then an uncertified passport key: the browser refuses both
 ```
 
 ## Demo script (about 4 minutes)
@@ -144,8 +152,8 @@ flowchart TB
   APP -->|face check| LIV
   APP -->|"new passkey, Guardian B signature, signed verdict"| REC
   REC -->|evidence over HTTP| SQG
-  SQG -.->|pinned vendor key| LIV
-  SQG -.->|pinned attestor key| PPG
+  SQG -.->|configured vendor key| LIV
+  SQG -.->|configured attestor key| PPG
   SQG -->|signs as owner| GA
   REC --> OPS
   OPS -->|submits recovery| SRM
@@ -190,7 +198,7 @@ Key files:
 | Swissquote + partner | No | No (they are one guardian together; Guardian B is still missing) |
 | Swissquote + passport guardian (passport backup) | No | Only with the client's own passport and live face: the passport guardian signs only after a ReadID scan of the enrolled chip with a passed face check, and has no other signing endpoint |
 | Thief with phone + e-mail | No (needs biometrics) | No (no Guardian B, fails the face match) |
-| Swissquote infrastructure compromised | No | No (still needs Guardian B; the web backend holds no guardian key at all) |
+| Swissquote infrastructure compromised | No | No (still needs Guardian B; the web backend holds no guardian key at all, and the browser refuses any guardian that is not of the published keys) |
 | Swissquote gone for good | Yes, client via the rescue page | Client's recovery factor + partner |
 
 ## Custody and the Travel Rule

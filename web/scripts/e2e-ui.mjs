@@ -42,7 +42,7 @@ try {
   await shot('onboarding-passkey');
   await clickText('Continue');
   if (PASSPORT) {
-    await clickText('Your passport');
+    await clickText('Passport or ID card');
     await clickText('Scan my passport');
     await clickText('Scan simulated passport');
   } else {
@@ -107,8 +107,11 @@ try {
       await clickText('Scan my passport');
     } else await clickText('Approve with recovery device');
     await waitText('approved', 60000);
-    await clickText('Start camera');
-    await clickText('Face matches my ID', 30000);
+    // The passport scan's face check stands in for Swissquote's own, so only the other backups need the camera.
+    if (!PASSPORT) {
+      await clickText('Start camera');
+      await clickText('Face matches my ID', 30000);
+    }
     log('liveness ok, waiting for on-chain submission');
     await waitText('takes over in', 120000);
     await shot('recover-pending');

@@ -7,15 +7,12 @@ import { createPassportGuardian } from '@/services/passport-core';
 import { handle, type Routes } from '@/services/store';
 
 const enabled = !!process.env.SERVICES_DATABASE_URL;
-const self = process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : 'http://localhost:3000';
-const livenessUrl = process.env.LIVENESS_URL ?? `${self}/api/svc/liveness`;
-const passportUrl = process.env.PASSPORT_URL ?? `${self}/api/svc/passport`;
 
 let services: Record<string, Routes> | undefined;
 const routes = (name: string) => {
   services ??= {
-    swissquote: createGuardian('swissquote', { livenessUrl, passportUrl }).routes,
-    partner: createGuardian('partner', { livenessUrl, passportUrl }).routes,
+    swissquote: createGuardian('swissquote').routes,
+    partner: createGuardian('partner').routes,
     liveness: createLiveness().routes,
     passport: createPassportGuardian().routes,
   };

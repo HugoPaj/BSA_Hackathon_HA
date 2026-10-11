@@ -27,10 +27,10 @@ const safeAbi = parseAbi([
   'function getOwners() view returns (address[])',
   'function getThreshold() view returns (uint256)',
 ]);
-const factoryAbi = parseAbi([
-  'function createProxyWithNonce(address singleton, bytes initializer, uint256 saltNonce) returns (address)',
-  'function proxyCreationCode() pure returns (bytes)',
-]);
+const factoryAbi = parseAbi(['function createProxyWithNonce(address singleton, bytes initializer, uint256 saltNonce) returns (address)']);
+// The factory's proxyCreationCode(), fixed here so the browser can compute the guardian Safe's address from the two
+// keys alone, without trusting an RPC answer. keccak256 = 0x1856e0ee08399d74e0ea0b03adca210aeade6f748969ac023cdcb4dd62dcaf5f
+const PROXY_CREATION_CODE: Hex = '0x608060405234801561001057600080fd5b506040516101e63803806101e68339818101604052602081101561003357600080fd5b8101908080519060200190929190505050600073ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff1614156100ca576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260228152602001806101c46022913960400191505060405180910390fd5b806000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055505060ab806101196000396000f3fe608060405273ffffffffffffffffffffffffffffffffffffffff600054167fa619486e0000000000000000000000000000000000000000000000000000000060003514156050578060005260206000f35b3660008037600080366000845af43d6000803e60008114156070573d6000fd5b3d6000f3fea264697066735822122003d1488ee65e08fa41e58e888a9865554c535f2c77126a82cb4c0f917f31441364736f6c63430007060033496e76616c69642073696e676c65746f6e20616464726573732070726f7669646564';
 
 const sorted = (owners: string[]) => [...owners].sort((a, b) => (BigInt(a) < BigInt(b) ? -1 : 1)) as Hex[];
 
@@ -42,13 +42,10 @@ function initializer(owners: string[]) {
   });
 }
 
-let creationCode: Hex | null = null;
-
 /** CREATE2 address of the guardian Safe for these owner keys. */
-export async function guardianSafeAddress(rpcUrl: string, owners: string[]) {
-  creationCode ??= await client(rpcUrl).readContract({ address: SAFE_PROXY_FACTORY, abi: factoryAbi, functionName: 'proxyCreationCode' });
+export function guardianSafeAddress(owners: string[]) {
   const salt = keccak256(concat([keccak256(initializer(owners)), `0x${SALT_NONCE.toString(16).padStart(64, '0')}`]));
-  const bytecode = concat([creationCode, `0x${BigInt(SAFE_SINGLETON).toString(16).padStart(64, '0')}`]);
+  const bytecode = concat([PROXY_CREATION_CODE, `0x${BigInt(SAFE_SINGLETON).toString(16).padStart(64, '0')}`]);
   return getContractAddress({ opcode: 'CREATE2', from: SAFE_PROXY_FACTORY, salt, bytecode });
 }
 

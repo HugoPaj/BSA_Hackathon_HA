@@ -23,6 +23,7 @@ import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { NODE_RPC } from '../lib/config';
 import { readWalletState, recoveryRequest } from '../lib/chain';
 import { attestationTypedData, type LivenessAttestation } from '../lib/liveness';
+import { enrollmentTypedData } from '../lib/guardian-keys';
 import { cloneCheck, createReadidProcess, readidConfigured, readidResult, type PassportResult, type ReadidProcess } from './readid';
 import { createStore, ServiceError, type Routes } from './store';
 
@@ -43,7 +44,8 @@ export type ScanStatus =
   | { status: 'retry'; reason: string }
   | { status: 'refused'; reason: string }
   | { status: 'done'; reason: string; enrollment?: PublicEnrollment; signature?: Hex; hash?: Hex; attestation?: LivenessAttestation };
-export type PublicEnrollment = { id: string; wallet: Hex; address: Hex; label: string; passport: { number: string; country?: string; name: string }; simulated: boolean };
+// certificate: this guardian's identity key (published, the attestor) vouching that `address` is its key for this wallet.
+export type PublicEnrollment = { id: string; wallet: Hex; address: Hex; label: string; passport: { number: string; country?: string; name: string }; simulated: boolean; certificate: Hex };
 
 class BadRequest extends ServiceError {
   constructor(message: string, status = 400) { super(message, status); }
@@ -58,7 +60,7 @@ export function createPassportGuardian(opts: { dir?: string } = {}) {
   const master = () => store.update<{ master: Hex }>('keys', (k) => k ?? { master: generatePrivateKey() }).then((k) => k.master);
   /** One key per enrolment, so the wallets this service guards cannot be linked on-chain. */
   const keyFor = async (enrollment: string) => privateKeyToAccount(keccak256(concat([await master(), toHex(enrollment)])));
-  /** Signs liveness attestations. One key for all wallets: Swissquote's guardian pins it. */
+  /** This guardian's identity: signs liveness attestations and certifies enrolment keys. One key for all wallets, published. */
   const attestor = async () => privateKeyToAccount(keccak256(concat([await master(), toHex('liveness-attestor')])));
 
   async function log(e: Omit<Entry, 'id' | 'ts'>) {
@@ -79,7 +81,11 @@ export function createPassportGuardian(opts: { dir?: string } = {}) {
       return { ...all, [s.id]: s };
     });
   }
-  const publicEnrollment = (e: Enrollment): PublicEnrollment => ({ id: e.id, wallet: e.wallet, address: e.address!, label: label(e.passport!, e.simulated), passport: { number: masked(e.passport!.number), country: e.passport!.country, name: e.passport!.name }, simulated: e.simulated });
+  const publicEnrollment = async (e: Enrollment): Promise<PublicEnrollment> => ({
+    id: e.id, wallet: e.wallet, address: e.address!, label: label(e.passport!, e.simulated), simulated: e.simulated,
+    passport: { number: masked(e.passport!.number), country: e.passport!.country, name: e.passport!.name },
+    certificate: await (await attestor()).signTypedData(enrollmentTypedData({ enrollment: e.id, wallet: e.wallet, guardian: e.address! })),
+  });
 
   async function openScan(purpose: Scan['purpose'], enrollment: string, callback: string | undefined, extra: Partial<Scan> = {}) {
     const s: Scan = { id: crypto.randomUUID(), purpose, enrollment, createdAt: Date.now(), ...extra };
@@ -119,7 +125,7 @@ export function createPassportGuardian(opts: { dir?: string } = {}) {
     const { hash } = await recoveryRequest(NODE_RPC, wallet, b.newOwner);
     const out = await openScan('recover', enrollment.id, b.callback, { newOwner: getAddress(b.newOwner), hash });
     await log({ action: 'Recovery scan started', wallet, detail: `New signer ${getAddress(b.newOwner)}. Waiting for ${label(enrollment.passport!, enrollment.simulated)}`, outcome: 'info' });
-    return { ...out, hash, passport: publicEnrollment(enrollment).passport };
+    return { ...out, hash, passport: (await publicEnrollment(enrollment)).passport };
   }
 
   /** Apply a scan result once: enrol the passport, or check it against the enrolment and sign the request. */
@@ -166,7 +172,7 @@ export function createPassportGuardian(opts: { dir?: string } = {}) {
   async function view(s: Scan, o: NonNullable<Scan['outcome']>): Promise<ScanStatus> {
     if (o.status === 'refused') return { status: 'refused', reason: o.reason };
     const e = (await enrollments())[s.enrollment];
-    return s.purpose === 'enroll' ? { status: 'done', reason: o.reason, enrollment: publicEnrollment(e) } : { status: 'done', reason: o.reason, signature: o.signature, hash: s.hash, attestation: o.attestation };
+    return s.purpose === 'enroll' ? { status: 'done', reason: o.reason, enrollment: await publicEnrollment(e) } : { status: 'done', reason: o.reason, signature: o.signature, hash: s.hash, attestation: o.attestation };
   }
 
   /** Poll a scan. The result comes from Signicat, fetched by this service, never from the caller. */

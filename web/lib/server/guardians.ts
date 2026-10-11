@@ -3,7 +3,8 @@ import 'server-only';
 // and storage. This backend can ask them to sign, and they check every request against the chain themselves.
 import { isAddressEqual, type Hex } from 'viem';
 import { NODE_RPC } from '../config';
-import { deployGuardianSafeTx, guardianSafeAddress, readGuardianSafe } from '../guardian-safe';
+import { deployGuardianSafeTx, readGuardianSafe } from '../guardian-safe';
+import { PUBLISHED_KEYS, publishedGuardianA } from '../guardian-keys';
 import { relay } from './aa';
 import type { LivenessAttestation } from '../liveness';
 import type { PublicEnrollment } from '@/services/passport-core';
@@ -31,15 +32,19 @@ export const guardianInfo = (role: Role) => call<GuardianInfo>(role, '/info');
 
 let deployed: Promise<{ address: string; owners: string[] }> | null = null;
 
-/** The Guardian A Safe (1-of-2: Swissquote HSM, independent partner). Deployed once by the operations Safe. */
+/**
+ * The Guardian A Safe (1-of-2: Swissquote HSM, independent partner), from the published keys. Deployed once by the
+ * operations Safe. The services must still hold those keys: a guardian whose /info disagrees is not ours.
+ */
 export function guardianSafe() {
   deployed ??= (async () => {
+    const address = publishedGuardianA();
+    const owners = [PUBLISHED_KEYS.swissquote!, PUBLISHED_KEYS.partner!];
     const [sq, partner] = await Promise.all([guardianInfo('swissquote'), guardianInfo('partner')]);
-    const owners = [sq.address, partner.address];
-    const address = await guardianSafeAddress(NODE_RPC, owners);
+    if (!isAddressEqual(sq.address as Hex, owners[0]) || !isAddressEqual(partner.address as Hex, owners[1])) throw new Error('The guardian services do not hold the published guardian keys');
     const onChain = await readGuardianSafe(NODE_RPC, address);
     if (!onChain) await relay([deployGuardianSafeTx(owners)]);
-    else if (!owners.every((o) => onChain.owners.some((x) => isAddressEqual(x as Hex, o as Hex)))) throw new Error('Guardian Safe owners do not match the guardian services');
+    else if (!owners.every((o) => onChain.owners.some((x) => isAddressEqual(x as Hex, o)))) throw new Error('Guardian Safe owners do not match the published guardian keys');
     return { address, owners };
   })().catch((e) => {
     deployed = null;

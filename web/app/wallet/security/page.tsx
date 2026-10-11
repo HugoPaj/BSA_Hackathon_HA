@@ -20,6 +20,7 @@ import { useWallet, type WalletData } from '@/lib/hooks';
 import { useTxFlow, friendly } from '@/lib/use-tx-flow';
 import { api } from '@/lib/api';
 import { Safe, factorName, srm } from '@/lib/chain';
+import { publishedGuardianA } from '@/lib/guardian-keys';
 import { hexToBytes, signWithPasskey } from '@/lib/passkey';
 import { forgetDevice } from '@/lib/device';
 import { shortAddress, timeAgo } from '@/lib/format';
@@ -74,6 +75,11 @@ function SecuritySkeleton() {
   );
 }
 
+/** Whether an on-chain guardian is the Safe of the guardian keys built into this app. */
+function isPublishedGuardianA(address: string) {
+  try { return publishedGuardianA().toLowerCase() === address.toLowerCase(); } catch { return false; }
+}
+
 function SecurityInner({ data, refresh }: { data: WalletData; refresh: () => void }) {
   const wallet = data.wallet!;
   const state = data.state!;
@@ -112,8 +118,9 @@ function SecurityInner({ data, refresh }: { data: WalletData; refresh: () => voi
               return (
                 <div key={g} className="flex items-center gap-3 rounded-xl bg-bg-weak-50 px-3 py-2.5">
                   <Icon className="size-5 shrink-0 text-text-sub-600" />
-                  <div className="min-w-0 flex-1"><div className="text-label-sm text-text-strong-950">{l.label}</div><div className="truncate font-mono text-paragraph-xs text-text-soft-400">{g}</div></div>
+                  <div className="min-w-0 flex-1"><div className="text-label-sm text-text-strong-950">{l.label}</div><div className="truncate font-mono text-paragraph-xs text-text-soft-400">{g}</div>{l.type === 'swissquote' && isPublishedGuardianA(g) && <div className="flex items-center gap-1 text-paragraph-xs text-success-base"><RiVerifiedBadgeFill className="size-3.5" />Matches Swissquote&apos;s published guardian keys</div>}</div>
                   {l.type === 'swissquote' && <MockTag>Mock HSM</MockTag>}
+                  {l.type === 'swissquote' && !isPublishedGuardianA(g) && <Badge.Root color="red" variant="lighter" title="Not the Safe of the guardian keys Swissquote publishes">Unverified</Badge.Root>}
                   <Badge.Root color="gray" variant="lighter">Can&apos;t spend</Badge.Root>
                 </div>
               );

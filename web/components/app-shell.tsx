@@ -20,7 +20,8 @@ const NAV = [
 const SCROLLER = 'app-scroll';
 
 /** Pages scroll inside the shell, not the window. Flows call this when they swap a long step for a shorter one, which iOS Safari otherwise leaves scrolled past the end. */
-export const scrollToTop = () => document.getElementById(SCROLLER)?.scrollTo({ top: 0 });
+// A block body: scrollTo returns a promise in newer browsers, and an effect must not return one.
+export const scrollToTop = () => { document.getElementById(SCROLLER)?.scrollTo({ top: 0 }); };
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
