@@ -4,6 +4,7 @@ import { RiArrowDownSLine, RiCheckboxCircleFill, RiCloseCircleFill, RiErrorWarni
 import type { Evaluation } from '@/lib/wallet-client';
 import type { Check, PlannedCheck } from '@/lib/server/policy';
 import { cn } from '@/utils/cn';
+import { MockTag } from './brand';
 
 const ICON = {
   pass: { icon: RiCheckboxCircleFill, cls: 'text-success-base' },
@@ -92,7 +93,7 @@ function CheckResult({ check: c }: { check: Check }) {
     <div className={cn('flex items-start gap-3 rounded-xl px-3 py-2.5 transition-colors duration-200', c.status === 'fail' ? 'bg-error-lighter' : c.status === 'pass' ? 'bg-bg-weak-50' : c.status === 'warn' ? 'bg-warning-lighter' : 'bg-primary-alpha-10')}>
       <I.icon className={cn('mt-px size-5 shrink-0 animate-pop-in', I.cls)} />
       <div className="min-w-0">
-        <div className="text-label-sm text-text-strong-950">{c.label}</div>
+        <div className="flex items-center gap-2 text-label-sm text-text-strong-950">{c.label}{c.id === 'sanctions' && <MockTag>Mock list</MockTag>}</div>
         <div className="animate-fade-in-up text-paragraph-xs text-text-sub-600">{c.detail}</div>
       </div>
     </div>

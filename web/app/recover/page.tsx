@@ -16,6 +16,7 @@ import { CardUnlock } from '@/components/card-unlock';
 import { MockTag } from '@/components/brand';
 import type { LivenessAttestation } from '@/lib/liveness';
 import { useSession } from '@/components/session';
+import { scrollToTop } from '@/components/app-shell';
 import { api, ApiError } from '@/lib/api';
 import { createPasskey, hexToBytes, signWithPasskey, type Passkey } from '@/lib/passkey';
 import { factorName, Safe, type WalletState } from '@/lib/chain';
@@ -67,6 +68,8 @@ export default function RecoverPage() {
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, identified]);
+  // Each stage replaces the panel, often with a shorter one: start it from the top.
+  useEffect(scrollToTop, [identified, !!newKey, info?.session?.status, !!info?.session?.guardianB]);
 
   // After going back to step 1, ignore whatever the previous identification loaded.
   const live = identified ? info : null;

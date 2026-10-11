@@ -44,8 +44,8 @@ export function AccountMenu() {
           </Link>
         </Dropdown.Item>
         <Dropdown.Separator className="mx-2 my-1 h-px bg-stroke-soft-200" />
-        <Dropdown.Item onSelect={async () => { await logout(); router.push('/'); }}>
-          <Dropdown.ItemIcon as={RiLogoutBoxRLine} />
+        <Dropdown.Item className="text-error-base data-[highlighted]:bg-error-lighter" onSelect={async () => { await logout(); router.push('/'); }}>
+          <Dropdown.ItemIcon as={RiLogoutBoxRLine} className="text-error-base" />
           Log out of Swissquote
         </Dropdown.Item>
       </Dropdown.Content>

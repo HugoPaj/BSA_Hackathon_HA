@@ -10,7 +10,7 @@ import * as SegmentedControl from '@/components/ui/segmented-control';
 import { LoginForm } from '@/components/login-card';
 import { SplitHeadline, SplitScreen } from '@/components/split-screen';
 import { useSession } from '@/components/session';
-import { SqMark, SwissFlag } from '@/components/brand';
+import { MockTag, SqMark, SwissFlag } from '@/components/brand';
 import { AreaChart, Sparkline } from '@/components/charts';
 import { FundSheet } from '@/components/fund-sheet';
 import { ChangePill, InstrumentLogo, InstrumentRow, PeriodControl, formatChartTime } from '@/components/market-ui';
@@ -216,7 +216,7 @@ function TradingCard({ s }: { s: MarketState }) {
   return (
     <section className="flex flex-col rounded-3xl bg-bg-white-0 p-5 shadow-regular-xs ring-1 ring-inset ring-stroke-soft-200 md:p-6">
       <Link href="/trade?tab=portfolio" className="flex items-center justify-between text-label-md text-text-strong-950 hover:text-primary-base">
-        Trading 2162953 <RiArrowRightSLine className="size-5 text-text-soft-400" />
+        <span className="flex items-center gap-2">Trading 2162953 <MockTag>Simulated</MockTag></span> <RiArrowRightSLine className="size-5 text-text-soft-400" />
       </Link>
       <div className="mt-3 flex items-center gap-2 text-[28px] font-medium tabular-nums leading-tight tracking-[-0.01em] text-text-strong-950 md:text-[32px]">
         <Num value={scrub?.v ?? v.total} /> <SwissFlag />

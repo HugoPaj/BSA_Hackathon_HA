@@ -4,6 +4,7 @@ import { RiCheckboxCircleFill, RiCloseCircleFill, RiErrorWarningFill, RiInformat
 import * as Badge from '@/components/ui/badge';
 import { RequireLogin } from '@/components/require-login';
 import { PageTitle } from '@/components/page-title';
+import { MockTag } from '@/components/brand';
 import { Bone, BoneLines, Skeleton } from '@/components/skeleton';
 import { useAlerts } from '@/lib/hooks';
 import { api } from '@/lib/api';
@@ -29,7 +30,7 @@ function Inbox() {
   }, [data]);
   return (
     <div className="mx-auto max-w-[720px]">
-      <PageTitle title="E-banking inbox" subtitle="Security alerts about your wallet. Each one also goes out by push and e-mail, so a thief who controls one channel cannot hide them." />
+      <PageTitle title="E-banking inbox" subtitle="Security alerts about your wallet. Each one also goes out by push and e-mail, so a thief who controls one channel cannot hide them." right={<MockTag>Push and e-mail mocked</MockTag>} />
       <div className="overflow-hidden rounded-3xl bg-bg-white-0 ring-1 ring-stroke-soft-200">
         {data === undefined ? (
           <Skeleton className="divide-y divide-stroke-soft-200">

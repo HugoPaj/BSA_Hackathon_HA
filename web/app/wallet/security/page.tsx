@@ -11,6 +11,7 @@ import * as FancyButton from '@/components/ui/fancy-button';
 import * as Alert from '@/components/ui/alert';
 import { RequireLogin } from '@/components/require-login';
 import { PageTitle } from '@/components/page-title';
+import { MockTag } from '@/components/brand';
 import { RecoveryBanner } from '@/components/recovery-banner';
 import { TxSheet } from '@/components/tx-sheet';
 import { NoWallet } from '@/components/no-wallet';
@@ -18,7 +19,7 @@ import { Bone, BoneCard, BoneLines, Skeleton } from '@/components/skeleton';
 import { useWallet, type WalletData } from '@/lib/hooks';
 import { useTxFlow, friendly } from '@/lib/use-tx-flow';
 import { api } from '@/lib/api';
-import { Safe, srm } from '@/lib/chain';
+import { Safe, factorName, srm } from '@/lib/chain';
 import { hexToBytes, signWithPasskey } from '@/lib/passkey';
 import { forgetDevice } from '@/lib/device';
 import { shortAddress, timeAgo } from '@/lib/format';
@@ -112,6 +113,7 @@ function SecurityInner({ data, refresh }: { data: WalletData; refresh: () => voi
                 <div key={g} className="flex items-center gap-3 rounded-xl bg-bg-weak-50 px-3 py-2.5">
                   <Icon className="size-5 shrink-0 text-text-sub-600" />
                   <div className="min-w-0 flex-1"><div className="text-label-sm text-text-strong-950">{l.label}</div><div className="truncate font-mono text-paragraph-xs text-text-soft-400">{g}</div></div>
+                  {l.type === 'swissquote' && <MockTag>Mock HSM</MockTag>}
                   <Badge.Root color="gray" variant="lighter">Can&apos;t spend</Badge.Root>
                 </div>
               );
@@ -126,7 +128,7 @@ function SecurityInner({ data, refresh }: { data: WalletData; refresh: () => voi
             <Badge.Root color={wallet.bankAssisted ? 'green' : 'gray'} variant="lighter" className="shrink-0">{wallet.bankAssisted ? 'On' : 'Off'}</Badge.Root>
           </div>
           <div className="mt-2 flex items-start justify-between gap-4 rounded-xl p-3 ring-1 ring-inset ring-stroke-soft-200">
-            <div><div className="text-label-sm text-text-strong-950">If Swissquote disappears</div><div className="text-paragraph-xs text-text-sub-600">The independent partner&apos;s rescue page works without any Swissquote server: send your funds out with your passkey, or recover with your {wallet.guardianB.type === 'card' ? 'recovery card' : 'recovery passkey'} and the partner. Keep your wallet address somewhere safe.</div></div>
+            <div><div className="text-label-sm text-text-strong-950">If Swissquote disappears</div><div className="text-paragraph-xs text-text-sub-600">The independent partner&apos;s rescue page works without any Swissquote server: send your funds out with your passkey, or recover with your {factorName(wallet.guardianB.type)} and the partner. Keep your wallet address somewhere safe.</div></div>
             <a className="flex shrink-0 items-center gap-1 text-label-xs text-primary-base hover:underline" target="_blank" href={rescueUrl(wallet.address)}>Rescue page <RiExternalLinkLine className="size-3.5" /></a>
           </div>
         </Section>

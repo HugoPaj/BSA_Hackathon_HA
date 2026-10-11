@@ -10,6 +10,7 @@ import { formatUsdc, toUnits } from '@/lib/format';
 import { recordWalletTransfer } from '@/lib/market';
 import { cn } from '@/utils/cn';
 import { Sheet } from './sheet';
+import { MockTag } from './brand';
 
 /** Moves testnet USDC from the demo treasury (standing in for the trading account) to the wallet. */
 export function FundSheet({ open, onOpenChange, verified, onDone }: { open: boolean; onOpenChange: (o: boolean) => void; verified: boolean; onDone: () => void }) {
@@ -27,7 +28,7 @@ export function FundSheet({ open, onOpenChange, verified, onDone }: { open: bool
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="rounded-xl bg-bg-weak-50 p-3 text-paragraph-sm text-text-sub-600">From <b className="text-text-strong-950">Trading 2162953</b> to your self-custody wallet. Testnet USDC from the demo treasury stands in for the bank&apos;s crypto desk.</div>
+          <div className="flex items-start justify-between gap-3 rounded-xl bg-bg-weak-50 p-3 text-paragraph-sm text-text-sub-600"><span>From <b className="text-text-strong-950">Trading 2162953</b> to your self-custody wallet. Testnet USDC from the demo treasury stands in for the bank&apos;s crypto desk.</span><MockTag>Mock desk</MockTag></div>
           <div className="grid grid-cols-3 gap-2">
             {[1_000_000n, 5_000_000n, 10_000_000n].map((a) => (
               <button key={a.toString()} onClick={() => setAmount(a)} className={cn('h-14 rounded-xl text-label-md ring-1 ring-inset transition active:scale-[0.97]', amount === a ? 'bg-primary-alpha-10 text-primary-dark ring-primary-base' : 'bg-bg-white-0 text-text-strong-950 ring-stroke-soft-200 hover:bg-bg-weak-50')}>{formatUsdc(a)}</button>

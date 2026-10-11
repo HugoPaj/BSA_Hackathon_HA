@@ -17,6 +17,11 @@ const NAV = [
   { href: '/wallet/dapps', label: 'dApps', icon: RiApps2Line, active: RiApps2Fill, match: (p: string) => p.startsWith('/wallet/dapps') },
 ];
 
+const SCROLLER = 'app-scroll';
+
+/** Pages scroll inside the shell, not the window. Flows call this when they swap a long step for a shorter one, which iOS Safari otherwise leaves scrolled past the end. */
+export const scrollToTop = () => document.getElementById(SCROLLER)?.scrollTo({ top: 0 });
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { signedIn } = useSession();
@@ -55,7 +60,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <div className="flex flex-1 flex-col overflow-y-auto [scrollbar-gutter:stable]">
+      <div id={SCROLLER} className="flex flex-1 flex-col overflow-y-auto [scrollbar-gutter:stable]">
         <main className={cn(landing ? 'flex flex-1 flex-col bg-bg-white-0' : 'mx-auto w-full max-w-[1220px] flex-1 px-4 pt-6 lg:px-8 lg:pt-10', !landing && (nav ? 'pb-28 md:pb-16' : 'pb-16'))}>{children}</main>
       </div>
 

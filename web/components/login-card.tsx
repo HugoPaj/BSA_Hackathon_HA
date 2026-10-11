@@ -6,6 +6,7 @@ import * as Label from '@/components/ui/label';
 import * as Button from '@/components/ui/button';
 import * as Alert from '@/components/ui/alert';
 import { DEMO_CLIENT } from '@/lib/config';
+import { MockTag } from './brand';
 import { useSession } from './session';
 import { cn } from '@/utils/cn';
 
@@ -52,7 +53,7 @@ export function LoginForm({ onDone, className, submit, label = 'Log in', busyLab
       </div>
       {error && <Alert.Root status="error" variant="lighter" size="small"><Alert.Icon />{error}</Alert.Root>}
       <Button.Root type="submit" className="w-full" disabled={busy}>{busy ? busyLabel : label}</Button.Root>
-      <p className="text-center text-paragraph-xs text-text-soft-400">Demo client {DEMO_CLIENT.name}, {DEMO_CLIENT.clientId} / {DEMO_CLIENT.password}. In production this is Swissquote&apos;s existing e-banking login with its own MFA.</p>
+      <p className="text-center text-paragraph-xs text-text-soft-400"><MockTag>Mock login</MockTag> Demo client {DEMO_CLIENT.name}, {DEMO_CLIENT.clientId} / {DEMO_CLIENT.password}. In production this is Swissquote&apos;s existing e-banking login with its own MFA.</p>
     </form>
   );
 }

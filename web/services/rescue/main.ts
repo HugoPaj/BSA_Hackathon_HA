@@ -250,6 +250,7 @@ on('factorPassport', 'factorLog', async () => {
     // Simulated passports live in the browser that enrolled them (the wallet's origin), so usually not here.
     const secret = localStorage.getItem('sq.simpassport.v1');
     if (!secret) throw new Error('The passport guardian runs simulated, and this browser holds no simulated passport');
+    say('factorLog', 'Mock: simulated passport. This browser presents the secret it enrolled.', 'warn');
     r = await passport<Scan>('/scan/simulate', { scan: s.scan, secret });
   } else {
     say('factorLog', `Open <a href="${s.link}">this ReadID Ready link</a> on your phone and scan your passport. This page waits for the result.`);

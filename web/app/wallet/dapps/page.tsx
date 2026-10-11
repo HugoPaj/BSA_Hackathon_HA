@@ -6,6 +6,7 @@ import * as StatusBadge from '@/components/ui/status-badge';
 import * as Button from '@/components/ui/button';
 import { RequireLogin } from '@/components/require-login';
 import { PageTitle } from '@/components/page-title';
+import { MockTag } from '@/components/brand';
 import { TxSheet } from '@/components/tx-sheet';
 import { NoWallet } from '@/components/no-wallet';
 import { Bone, BoneCard, BoneLines, Skeleton } from '@/components/skeleton';
@@ -52,7 +53,7 @@ function DappsInner({ data, treasury, refresh }: { data: Required<NonNullable<Re
       ],
     },
     {
-      name: 'Free Token Airdrop', site: 'claim-airdrop-now.xyz', icon: RiGiftLine, allowlisted: false,
+      name: 'Free Token Airdrop', site: 'claim-airdrop-now.xyz', icon: RiGiftLine, allowlisted: false, fictional: true,
       blurb: 'A site you found through an ad. Classic wallet-drainer pattern.',
       actions: [
         { id: 'drainer', title: 'Claim 500 tokens', description: `Actually: unlimited USDC approval to ${shortAddress(UNKNOWN_SPENDER)}`, txs: [approveTx(UNKNOWN_SPENDER, MAX), fee], meta: { title: 'Airdrop site: unlimited approval' } },
@@ -69,7 +70,7 @@ function DappsInner({ data, treasury, refresh }: { data: Required<NonNullable<Re
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
                 <span className="grid size-11 place-items-center rounded-xl bg-bg-weak-50 text-text-strong-950"><d.icon className="size-6" /></span>
-                <div><div className="text-label-md text-text-strong-950">{d.name}</div><div className="text-paragraph-xs text-text-soft-400">{d.site}</div></div>
+                <div><div className="flex items-center gap-2 text-label-md text-text-strong-950">{d.name}{d.fictional && <MockTag>Demo site</MockTag>}</div><div className="text-paragraph-xs text-text-soft-400">{d.site}</div></div>
               </div>
               <StatusBadge.Root status={d.allowlisted ? 'completed' : 'failed'} variant="stroke">
                 <StatusBadge.Icon as={d.allowlisted ? RiShieldCheckLine : RiForbidLine} />{d.allowlisted ? 'Allowlisted' : 'Not verified'}

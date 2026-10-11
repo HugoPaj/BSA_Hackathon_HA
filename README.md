@@ -19,8 +19,8 @@ Hackathon prototype for the Swissquote Wallet Challenge: a wallet a Swiss bank c
 | EIP-712 guardian approvals, EIP-1271 guardian passkey, owner swap, old-key revocation | Fiat funding: a treasury Safe holding testnet USDC stands in for the crypto desk |
 | Gas sponsorship (Candide paymaster), bundler, USDC transfers, batched service fee | Push and e-mail channels (the alerts are real; delivery is the in-app inbox and toasts) |
 | Simulation: `eth_call` from the wallet plus bundler gas estimation | Per-client trusted contact as Guardian A (designed, not wired into the recovery UI) |
-| Ownership proof checked on-chain via EIP-1271 | The ID card in the browser (a simulated card; the Android *Swissquote ID* app reads a real card over NFC, not yet tested on a physical card) |
-| ID card as Guardian B: `RsaGuardian` contract verifies the card's RSA signature on-chain (EIP-1271) | |
+| Ownership proof checked on-chain via EIP-1271 | Passport or ID card scan when the passport guardian has no Signicat credentials: a secret kept in the enrolling browser stands in for the chip (labelled *Simulated passport*) |
+| Passport or ID card as Guardian B: a separate passport guardian service signs the recovery request only after a ReadID Ready scan of the enrolled document (chip authenticity, clone check, iProov face check) | Trading account, market prices and the USDC/CHF rate (simulated in the browser, labelled *Simulated*) |
 
 **Liveness is mocked, but its verdict cannot be faked by Swissquote's backend.** The vendor is a separate process with its own key. It signs an EIP-712 attestation bound to the client, the wallet and the exact recovery request (new owner and nonce). Swissquote's guardian accepts it only if all of these hold:
 
@@ -28,7 +28,7 @@ Hackathon prototype for the Swissquote Wallet Challenge: a wallet a Swiss bank c
 - it is fresh (10 minutes) and has not been used before;
 - its client matches the KYC file named in the wallet owner's own passkey-signed ownership proof, which the guardian re-checks on-chain (EIP-1271).
 
-The web backend only relays this evidence. A compromised backend that holds a valid Guardian B signature still cannot get Swissquote's approval. The tests cover a forged verdict, an edited verdict, a verdict for another request, and an ownership proof rewritten to another client. Only the face analysis itself is mocked: the demo chooses the outcome.
+The web backend only relays this evidence. A compromised backend that holds a valid Guardian B signature still cannot get Swissquote's approval. The tests cover a forged verdict, an edited verdict, a verdict for another request, and an ownership proof rewritten to another client. Only the face analysis itself is mocked: the demo chooses the outcome. Wallets backed by a passport skip this mock: the passport guardian signs the same attestation from ReadID's live face check against the chip photo, and Swissquote's guardian pins its key too.
 
 No API key or testnet ETH is needed. Candide's public Base Sepolia endpoint provides the bundler and sponsors gas.
 
@@ -39,7 +39,7 @@ The public endpoint sponsors anyone who calls it, so the policy only holds insid
 ```bash
 cd web
 npm install
-npm run dev            # starts all five processes below
+npm run dev            # starts all six processes below
 ```
 
 | Process | Port | Run by | Local storage | Deployed on Vercel |
@@ -48,11 +48,12 @@ npm run dev            # starts all five processes below
 | Swissquote guardian HSM (mock) | 4101 (localhost only) | Swissquote | `.data/guardian-swissquote/` | Project `swissquote-guardians`, `/api/svc/swissquote` |
 | Liveness vendor (mock) | 4103 (localhost only; the browser reaches it via `/liveness/*`) | Identity-verification vendor | `.data/liveness/` | Project `swissquote-guardians`, `/api/svc/liveness` |
 | Independent partner guardian (mock) | 4102 (localhost only) | Partner | `.data/guardian-partner/` | Project `swissquote-guardians`, `/api/svc/partner` |
+| Passport guardian (Guardian B; simulated without Signicat credentials) | 4104 (localhost only; the browser reaches it via `/passport-guardian/*`) | Identity-verification vendor | `.data/passport/` | Project `swissquote-guardians`, `/api/svc/passport` |
 | Rescue page | 4200 | Partner | none (static page) | Not deployed (local only) |
 
 The `swissquote-guardians` project runs the same code with a separate database (`SERVICES_DATABASE_URL`). The web app never gets that URL, so it can only reach the guardians over HTTP, like anyone else. In the hosted demo, the three mocked services share that one database, with one namespace per service. In production, each would be run by a different company.
 
-`npm run dev:no-swissquote` starts only the partner guardian and the rescue page, to show that the wallet survives Swissquote disappearing.
+`npm run dev:no-swissquote` starts only the partner guardian, the passport guardian and the rescue page, to show that the wallet survives Swissquote disappearing.
 
 Passkeys are bound to the hostname. Use `localhost` on the same machine, or one HTTPS hostname everywhere, such as a Tailscale `serve` URL or Vercel. Passkeys created on one hostname do not work on another. The binding is to the hostname, not the port, so the rescue page on port 4200 can use the wallet's passkeys. Behind one HTTPS hostname, serve port 4200 on the same hostname too (for example `tailscale serve --https=8443 4200`) and set `NEXT_PUBLIC_RESCUE_URL`.
 
@@ -66,19 +67,20 @@ node scripts/e2e-ui.mjs               # real UI in headless Chromium with a virt
 node scripts/e2e-ui.mjs --recover     # ...plus the full recovery, the cancel banner and the old-passkey rejection (~5 min)
 npx tsx scripts/e2e-rescue.mts        # Swissquote gone: send via public bundler, attacker refusals, card + partner recovery (~4 min)
 npx tsx scripts/e2e-rescue-ui.mts     # ...the same through the rescue page in headless Chromium, checking it never contacts Swissquote
+npx tsx scripts/e2e-passport-chain.mts # passport guardian (simulated): enrol, refuse another passport, sign, multiConfirmRecovery on-chain
 ```
 
 ## Demo script (about 4 minutes)
 
-1. **Create.** Log in as the demo client (pre-filled), then choose *Open self-custody wallet*. Create the passkey, add a recovery passkey on another device (or a PIN-locked recovery card), and leave bank-assisted recovery on. A single sponsored transaction then deploys the Safe, swaps in the passkey owner, enables the recovery module and registers both guardians.
+1. **Create.** Log in as the demo client (pre-filled), then choose *Open self-custody wallet*. Create the passkey, then choose a backup: your passport or ID card (recommended, scanned once in the ReadID Ready app), a recovery passkey on another device, or a PIN-locked recovery card. Leave bank-assisted recovery on. A single sponsored transaction then deploys the Safe, swaps in the passkey owner, enables the recovery module and registers both guardians.
 2. **Prove.** Sign the ownership proof. Swissquote verifies it on-chain (EIP-1271) and archives it. This is FINMA 02/2019 wallet verification without screenshots.
 3. **Fund.** *Add money* moves testnet USDC from the "Swissquote account" to the wallet.
-4. **Send.** Pay Bob. The review shows the allowlist, sanctions screen, simulation, the 0.05 USDC fee and *Sponsored by Swissquote*. Face ID signs, and BaseScan shows the batched transfer. Above 5 USDC (sent or approved), the recovery factor confirms too.
+4. **Send.** Pay Bob. The review shows the allowlist, sanctions screen, simulation, the 0.05 USDC fee and *Sponsored by Swissquote*. The passkey signs, and BaseScan shows the batched transfer. Above 5 USDC (sent or approved), a recovery passkey or card confirms too. A passport only approves recovery, never payments.
 5. **Compliance.** Send to *Unknown recipient* (an OFAC address), or click *Claim 500 tokens* on the drainer dApp. Swissquote **declines to sponsor**, explains why, and still offers *Send anyway, I pay gas in ETH*: it declines a service, it never blocks.
 6. **Attack.** On another browser, log in and start a recovery. The attacker has no Guardian B (*I don't have it*) and fails the face check (*Simulate: someone else*). The owner's inbox and toasts show *Recovery attempt blocked*.
-7. **Lose and recover.** Delete the passkey (Chrome DevTools > WebAuthn) or use a second device. On */recover*: create a new passkey, approve with the recovery device, pass the face check, and Swissquote's guardian signs. During the 3-minute delay, the original device shows *This wasn't me, cancel recovery*. After the delay, choose *Finish recovery*.
+7. **Lose and recover.** Delete the passkey (Chrome DevTools > WebAuthn) or use a second device. On */recover*: create a new passkey, approve with your backup, pass the face check, and Swissquote's guardian signs. With a passport, one ReadID scan covers both the approval and the face check. During the 3-minute delay, the original device shows *This wasn't me, cancel recovery*. After the delay, choose *Finish recovery*.
 8. **Prove again.** The new passkey signs. *Security > Try the old passkey* is rejected on-chain (AA24). The operations view shows every decision in the audit log, including the guardian processes' own logs.
-9. **Swissquote is gone.** Stop `npm run dev` and start `npm run dev:no-swissquote`. Open *Security > Rescue page* (port 4200). With the passkey: send the USDC out through a public bundler, with no Swissquote approval or fee. Without it: create a new passkey, sign with the recovery card or recovery passkey, pass the partner's (mock) identification, and the partner approves as Guardian A and submits. After the delay, *Finish recovery*.
+9. **Swissquote is gone.** Stop `npm run dev` and start `npm run dev:no-swissquote`. Open *Security > Rescue page* (port 4200). With the passkey: send the USDC out through a public bundler, with no Swissquote approval or fee. Without it: create a new passkey, approve with your passport, recovery card or recovery passkey, pass the partner's (mock) identification, and the partner approves as Guardian A and submits. After the delay, *Finish recovery*.
 
 ## Architecture
 
@@ -94,7 +96,7 @@ flowchart TB
     PK["Passkey in the secure enclave<br/>REAL · WebAuthn P-256"]:::real
     APP["Wallet app in the browser<br/>REAL · builds UserOps, checks the sponsored op is unchanged"]:::real
     GB["Guardian B: recovery passkey or recovery card<br/>REAL keys"]:::real
-    IDC["Guardian B: ID card<br/>MOCK card in the browser · Android NFC app built, untested on a real card"]:::mock
+    PASS["Guardian B: passport or ID card<br/>REAL chip, scanned in the ReadID Ready app"]:::real
   end
 
   subgraph SQ["Swissquote backend · Next.js :3000 · Vercel project swissquote"]
@@ -106,10 +108,11 @@ flowchart TB
     FIAT["Fiat funding: treasury Safe with testnet USDC<br/>MOCK"]:::mock
   end
 
-  subgraph SVC["Separate services · own keys and storage · :4101-4103 · Vercel project swissquote-guardians"]
+  subgraph SVC["Separate services · own keys and storage · :4101-4104 · Vercel project swissquote-guardians"]
     SQG["Swissquote guardian<br/>MOCK HSM: software key · REAL on-chain re-checks"]:::mock
     LIV["Liveness vendor<br/>MOCK face analysis · REAL signed EIP-712 verdict"]:::mock
     PG["Independent partner guardian<br/>MOCK partner and video identification"]:::mock
+    PPG["Passport guardian<br/>REAL ReadID scan: chip, clone check, iProov face check · software key · MOCK passport without Signicat credentials"]:::real
   end
 
   RESCUE["Rescue page, hosted by the partner · :4200<br/>REAL · talks to no Swissquote server"]:::real
@@ -123,7 +126,6 @@ flowchart TB
     SAFE["Client Safe v1.4.1 + Safe4337Module<br/>owner = passkey signer proxy"]:::real
     SRM["Social Recovery Module<br/>2 of 2 guardians, delay, owner can cancel"]:::real
     GA["Guardian A Safe, 1 of 2<br/>owners: Swissquote guardian, partner"]:::real
-    RSA["RsaGuardian contract<br/>checks the ID card's RSA signature"]:::real
     USDC["USDC"]:::real
   end
 
@@ -137,21 +139,23 @@ flowchart TB
   FIAT -->|Add money| SAFE
 
   GB -->|signs the recovery request| APP
-  IDC -->|signs the recovery request| APP
+  PASS -->|"chip and live face, via ReadID"| PPG
+  APP -->|"start a scan, collect the signature"| PPG
   APP -->|face check| LIV
   APP -->|"new passkey, Guardian B signature, signed verdict"| REC
   REC -->|evidence over HTTP| SQG
   SQG -.->|pinned vendor key| LIV
+  SQG -.->|pinned attestor key| PPG
   SQG -->|signs as owner| GA
   REC --> OPS
   OPS -->|submits recovery| SRM
   GA -->|"EIP-1271 approval"| SRM
-  RSA -->|"EIP-1271 approval"| SRM
   SRM -->|"swaps the owner after the delay"| SAFE
 
   RESCUE -->|send or recover| BUN
   RESCUE --> RPC
   RESCUE -->|"Guardian B signature, identification"| PG
+  RESCUE -->|passport scan| PPG
   PG -->|signs as owner| GA
   PG -->|submits recovery| SRM
 ```
@@ -169,11 +173,11 @@ Key files:
 | Guardian service: own key, own storage, on-chain policy (runs twice: Swissquote, partner) | `web/services/guardian-core.ts` |
 | Liveness vendor: own key, signed EIP-712 verdicts | `web/services/liveness-core.ts`, `web/lib/liveness.ts` |
 | Services' own storage (files locally, separate database when deployed) | `web/services/store.ts` |
-| Services as local processes / as the `swissquote-guardians` Vercel project | `web/services/guardian.ts`, `web/services/liveness.ts` / `web/app/api/svc/[service]/[...path]/route.ts` |
+| Services as local processes / as the `swissquote-guardians` Vercel project | `web/services/guardian.ts`, `web/services/liveness.ts`, `web/services/passport.ts` / `web/app/api/svc/[service]/[...path]/route.ts` |
 | Guardian A Safe (1-of-2): address, deployment, SafeMessage signatures | `web/lib/guardian-safe.ts` |
 | Rescue page (no Swissquote servers) | `web/services/rescue/` |
 | Recovery card (offline guardian key, PIN-encrypted) | `web/lib/card.ts` |
-| ID card guardian: on-chain RSA check, browser simulator, Android NFC signer | `web/contracts/RsaGuardian.sol`, `web/lib/rsa-guardian.ts`, `web/lib/dnie-sim.ts`, `android/` |
+| Passport guardian: enrolment, ReadID Ready scans, recovery signature and liveness attestation, simulated mode | `web/services/passport-core.ts`, `web/services/readid.ts`, `web/components/passport-scan.tsx` |
 
 ### Custody in one table
 
@@ -184,6 +188,7 @@ Key files:
 | Swissquote + client's recovery factor | No | After the delay, which the owner can cancel |
 | Partner + client's recovery factor (Swissquote gone) | No | After the delay, which the owner can cancel |
 | Swissquote + partner | No | No (they are one guardian together; Guardian B is still missing) |
+| Swissquote + passport guardian (passport backup) | No | Only with the client's own passport and live face: the passport guardian signs only after a ReadID scan of the enrolled chip with a passed face check, and has no other signing endpoint |
 | Thief with phone + e-mail | No (needs biometrics) | No (no Guardian B, fails the face match) |
 | Swissquote infrastructure compromised | No | No (still needs Guardian B; the web backend holds no guardian key at all) |
 | Swissquote gone for good | Yes, client via the rescue page | Client's recovery factor + partner |
@@ -258,7 +263,7 @@ ERC-4337 is EVM-only, and we do not claim otherwise.
 
 | Tool | Used for |
 |---|---|
-| Claude Code with Claude Opus 5.5 (Anthropic) | Writing and refactoring most of the code: the Next.js app, the guardian and liveness services, the rescue page, the `RsaGuardian` contract, the Android ID-card signer, the end-to-end test scripts, and the deck generator (`docs/deck/build.js`). Also used for these docs and for debugging through headless Chromium with a virtual WebAuthn authenticator. Several sessions ran in parallel on separate parts. Every commit is co-authored by it |
+| Claude Code with Claude Opus 5.5 (Anthropic) | Writing and refactoring most of the code: the Next.js app, the guardian, liveness and passport guardian services, the rescue page, the end-to-end test scripts, and the deck generator (`docs/deck/build.js`). Also used for these docs and for debugging through headless Chromium with a virtual WebAuthn authenticator. Several sessions ran in parallel on separate parts. Every commit is co-authored by it |
 | Claude (Anthropic) | Adversarial review of the plan, checking legal and vendor claims against primary sources: [docs/review-claude.md](docs/review-claude.md) |
 | Codex (OpenAI) | A second, independent adversarial review of the same plan: [docs/review-codex.md](docs/review-codex.md) |
 <!-- TODO: confirm the tool behind web/public/landing/hero.webp and recover.webp, and any other tools used -->

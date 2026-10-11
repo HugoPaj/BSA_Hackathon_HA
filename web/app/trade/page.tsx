@@ -12,6 +12,7 @@ import {
 } from '@/lib/market';
 import { cn } from '@/utils/cn';
 import { Num, SignedNum } from '@/components/num';
+import { MockTag } from '@/components/brand';
 import { formatNumber } from '@/lib/format';
 
 const CATS: { id: string; label: string; title: string; kinds: Kind[] }[] = [
@@ -46,7 +47,7 @@ function Trade() {
     // The tab root is the page grid, so the sidebar can sit in the content row and line up with the first card.
     <TabMenu.Root value={tab} onValueChange={(v) => setParam('tab', v)} className="mx-auto grid max-w-[1080px] gap-x-6 lg:grid-cols-[1fr_320px]">
       <div className="mb-2 flex min-w-0 items-end justify-between gap-4">
-        <h1 className="text-title-h5 text-text-strong-950 md:text-title-h4">Trade</h1>
+        <h1 className="flex items-center gap-2 text-title-h5 text-text-strong-950 md:text-title-h4">Trade <MockTag>Simulated market</MockTag></h1>
         <span className="text-paragraph-xs tabular-nums text-text-soft-400">Updated {new Date(s.updatedAt).toLocaleTimeString('de-CH')}</span>
       </div>
       <TabMenu.List wrapperClassName="lg:col-start-1">

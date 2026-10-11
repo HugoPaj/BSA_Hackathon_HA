@@ -6,6 +6,7 @@ import { RiWallet3Line } from '@remixicon/react';
 import * as Button from '@/components/ui/button';
 import * as TabMenu from '@/components/ui/tab-menu-horizontal';
 import { PageTitle } from '@/components/page-title';
+import { MockTag } from '@/components/brand';
 import { RequireLogin } from '@/components/require-login';
 import { InstrumentLogo } from '@/components/market-ui';
 import { formatNumber } from '@/lib/format';
@@ -29,7 +30,7 @@ function Orders() {
   const tab = params.get('tab') ?? 'open';
   return (
     <div className="mx-auto max-w-[760px]">
-      <PageTitle title="Orders and transactions" subtitle="Trading 2162953" back="/" />
+      <PageTitle title="Orders and transactions" subtitle="Trading 2162953" back="/" right={<MockTag>Simulated</MockTag>} />
       <TabMenu.Root value={tab} onValueChange={(v) => router.replace(`/trade/orders?tab=${v}`, { scroll: false })}>
         <TabMenu.List>
           <TabMenu.Trigger value="open">Open orders</TabMenu.Trigger>

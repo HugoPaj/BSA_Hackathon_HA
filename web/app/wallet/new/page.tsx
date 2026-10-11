@@ -16,8 +16,8 @@ import * as Input from '@/components/ui/input';
 import * as Checkbox from '@/components/ui/checkbox';
 import { RequireLogin } from '@/components/require-login';
 import { ChecksList } from '@/components/checks';
-import { MockTag } from '@/components/brand';
 import { useSession } from '@/components/session';
+import { scrollToTop } from '@/components/app-shell';
 import { createPasskey, passkeysSupported, signWithPasskey, hexToBytes, type Passkey } from '@/lib/passkey';
 import { createRecoveryCard } from '@/lib/card';
 import { counterfactualAddress, passkeySignerAddress, setupTransactions, Safe, type GuardianB } from '@/lib/chain';
@@ -51,6 +51,8 @@ function Onboarding() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- restore once, client-side
     if (p?.context) { setOwner(p.context); setStep('factor'); }
   }, []);
+  // A new step, or the backup step collapsing once the backup is added, would otherwise leave mobile scrolled past the end.
+  useEffect(scrollToTop, [step, factor]);
 
   return (
     <div className="mx-auto max-w-[560px]">
@@ -383,7 +385,6 @@ function ProofStep({ owner }: { owner: Passkey }) {
           <h2 className="text-title-h5 text-text-strong-950">Prove ownership to Swissquote</h2>
           <p className="mt-1 text-paragraph-sm text-text-sub-600">Confirm with your passkey that this wallet belongs to you, so you can add money from your Swissquote account. This does not send money or give Swissquote access to your funds.</p>
         </div>
-        <MockTag>Compliance</MockTag>
       </div>
       {done ? (
         <div className="space-y-4">
