@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   RiArrowLeftLine, RiArrowRightLine, RiCheckLine, RiCloseCircleFill, RiShieldCheckLine, RiFingerprintLine, RiMacbookLine,
-  RiUserForbidLine, RiCameraLine, RiCheckboxCircleFill, RiExternalLinkLine,
+  RiUserForbidLine, RiCameraLine, RiCheckboxCircleFill, RiExternalLinkLine, RiArrowDownSLine,
 } from '@remixicon/react';
 import * as FancyButton from '@/components/ui/fancy-button';
 import * as Button from '@/components/ui/button';
@@ -19,7 +19,7 @@ import { useSession } from '@/components/session';
 import { api, ApiError } from '@/lib/api';
 import { createPasskey, hexToBytes, signWithPasskey, type Passkey } from '@/lib/passkey';
 import { factorName, Safe, type WalletState } from '@/lib/chain';
-import { DnieSign, type DnieRequest } from '@/components/dnie-sign';
+import { PassportScan, passportGuardian, type ScanStart } from '@/components/passport-scan';
 import { friendly, type CardSigner } from '@/lib/use-tx-flow';
 import { saveDevice } from '@/lib/device';
 import { useNow } from '@/lib/hooks';
@@ -134,7 +134,7 @@ function recoverySteps(info: Info | null, hasKey: boolean, identified: boolean) 
     { t: 'Identify with your Swissquote login', done: identified },
     { t: 'New passkey on this device', done: hasKey },
     { t: 'Your recovery factor approves', done: !!s?.guardianB },
-    { t: 'Swissquote face check approves', done: !!s?.swissquote || s?.liveness?.result === 'match', failed: s?.status === 'refused' },
+    { t: info?.wallet?.guardianB.type === 'passport' ? 'Swissquote approves' : 'Swissquote face check approves', done: !!s?.swissquote || s?.liveness?.result === 'match', failed: s?.status === 'refused' },
     { t: `Safety delay (${RECOVERY_DELAY_LABEL})`, done: s?.status === 'finalized' },
   ];
   const current = items.findIndex((i) => !i.done);
@@ -228,9 +228,11 @@ function StartRecovery({ info, newKey, onStarted }: { info: Info; newKey: Passke
 }
 
 function Collect({ info, session, onChange }: { info: Info; session: PublicRecoverySession; onChange: () => void }) {
-  // One guardian at a time, in the order of the steps: your recovery factor, then Swissquote's face check.
-  if (!session.guardianB) return <GuardianB info={info} session={session} onDone={onChange} />;
-  if (session.swissquote || session.liveness?.result === 'match') return <Approved text="Face check passed. Swissquote is signing the request." />;
+  // One guardian at a time, in the order of the steps: your recovery factor, then Swissquote's face check. A passport
+  // scan covers both: ReadID's live face check against the chip photo is Swissquote's liveness evidence.
+  const passport = info.wallet!.guardianB.type === 'passport';
+  if (session.swissquote || session.liveness?.result === 'match') return <Approved text={passport ? 'Passport and live face check passed. Swissquote is signing the request.' : 'Face check passed. Swissquote is signing the request.'} />;
+  if (!session.guardianB || passport) return <GuardianB info={info} session={session} onDone={onChange} />;
   return <><Approved text={`${info.wallet!.guardianB.label} approved`} /><Liveness session={session} onDone={onChange} /></>;
 }
 
@@ -249,12 +251,31 @@ function GuardianB({ info, session, onDone }: { info: Info; session: PublicRecov
       <div>
         <h2 className="text-title-h4 text-text-strong-950">Approve with your {factorName(gB.type)}</h2>
         <p className="mt-2 text-paragraph-md text-text-sub-600">
-          {gB.type === 'dnie' ? `Your ID card approves this exact request. Open the Swissquote ID app on an Android phone, enter the CAN printed on the card and your PIN, and hold the card to the phone. The wallet's guardian contract checks the card's signature on-chain.` : gB.type === 'passkey' ? 'Your browser will ask for the recovery passkey. Choose “Use another device” and scan the QR code with the phone or laptop that holds it, or use your security key.' : 'Use the recovery card you printed or copied when you created your wallet, plus the PIN you chose for it. The card key signs the request in this browser and is never sent anywhere.'}
+          {gB.type === 'passport' ? `Scan the document you enrolled (${gB.label}) with the ReadID Ready app, then look into the camera for the live face check. The passport guardian checks that the chip is authentic, not a clone, the one you enrolled, and that your face matches its photo. Then it signs exactly this request, and Swissquote accepts the same face check.` : gB.type === 'passkey' ? 'Your browser will ask for the recovery passkey. Choose “Use another device” and scan the QR code with the phone or laptop that holds it, or use your security key.' : 'Use the recovery card you printed or copied when you created your wallet, plus the PIN you chose for it. The card key signs the request in this browser and is never sent anywhere.'}
         </p>
       </div>
-      <div className="rounded-xl bg-bg-weak-50 p-3 font-mono text-[11px] leading-relaxed text-text-sub-600">ExecuteRecovery(wallet {shortAddress(session.wallet)}, newOwners [{shortAddress(session.newOwner.signer)}], newThreshold 1, nonce {session.nonce})</div>
-      {gB.type === 'dnie' ? (
-        <DnieSign create={() => api<{ request: DnieRequest }>('/api/recovery', { action: 'dnie', id: session.id }).then((r) => r.request)} onDone={onDone} />
+      <details className="group rounded-xl bg-bg-weak-50">
+        <summary className="flex cursor-pointer list-none items-start justify-between gap-3 rounded-xl p-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-base [&::-webkit-details-marker]:hidden">
+          <span className="text-paragraph-sm text-text-sub-600"><b className="text-text-strong-950">You&apos;re approving:</b> move wallet {shortAddress(session.wallet)} to the new passkey on this device. Your old passkey will stop working.</span>
+          <RiArrowDownSLine className="size-5 shrink-0 text-text-soft-400 transition-transform group-open:rotate-180" />
+        </summary>
+        <div className="px-4 pb-4">
+          <p className="text-label-xs text-text-soft-400">Technical details: the exact message signed</p>
+          <p className="mt-1 break-all font-mono text-[11px] leading-relaxed text-text-sub-600">ExecuteRecovery(wallet {shortAddress(session.wallet)}, newOwners [{shortAddress(session.newOwner.signer)}], newThreshold 1, nonce {session.nonce})</p>
+        </div>
+      </details>
+      {gB.type === 'passport' ? (
+        <PassportScan
+          storageKey={`sq.passport.recover.${session.id}`}
+          purpose="recover"
+          start={(callback) => passportGuardian<ScanStart>('/recover', { wallet: session.wallet, newOwner: session.newOwner.signer, callback })}
+          onDone={async (s) => {
+            if (s.hash?.toLowerCase() !== session.hash.toLowerCase()) throw new Error('The passport guardian signed a different request. Start the recovery again.');
+            await api('/api/recovery', { action: 'guardian', id: session.id, signature: s.signature });
+            await api('/api/recovery', { action: 'liveness', id: session.id, attestation: s.attestation });
+            onDone();
+          }}
+        />
       ) : gB.type === 'passkey' ? (
         <FancyButton.Root variant="neutral" className="h-12 w-full" disabled={busy} onClick={async () => {
           setBusy(true); setError(null);
@@ -290,7 +311,11 @@ function Liveness({ session, onDone }: { session: PublicRecoverySession; onDone:
   const [scan, setScan] = useState(0);
   const [busy, setBusy] = useState<false | 'match' | 'mismatch'>(false);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => () => { (video.current?.srcObject as MediaStream | null)?.getTracks().forEach((t) => t.stop()); }, []);
+  // Held in its own ref: by the time an unmount cleanup runs, React has already cleared video.current.
+  const stream = useRef<MediaStream | null>(null);
+  const unmounted = useRef(false);
+  const stopCamera = () => { stream.current?.getTracks().forEach((t) => t.stop()); stream.current = null; };
+  useEffect(() => { unmounted.current = false; return () => { unmounted.current = true; stopCamera(); }; }, []);
   useEffect(() => {
     if (cam !== 'on' || scan >= 100) return;
     const t = setTimeout(() => setScan((s) => Math.min(100, s + 4)), 80);
@@ -298,8 +323,10 @@ function Liveness({ session, onDone }: { session: PublicRecoverySession; onDone:
   }, [cam, scan]);
   const start = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
-      if (video.current) { video.current.srcObject = stream; await video.current.play(); }
+      const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+      stopCamera(); stream.current = s;
+      if (unmounted.current) return stopCamera();
+      if (video.current) { video.current.srcObject = s; await video.current.play(); }
       setCam('on');
     } catch { setCam('denied'); setScan(100); }
   };
@@ -310,7 +337,7 @@ function Liveness({ session, onDone }: { session: PublicRecoverySession; onDone:
       const { session: vendorSession } = await vendor<{ session: string }>('/liveness/sessions', { subject: session.clientId, wallet: session.wallet, request: session.hash });
       const { attestation } = await vendor<{ attestation: LivenessAttestation }>('/liveness/sessions/complete', { session: vendorSession, result });
       await api('/api/recovery', { action: 'liveness', id: session.id, attestation });
-    } catch (e) { setError((e as Error).message); } finally { setBusy(false); (video.current?.srcObject as MediaStream | null)?.getTracks().forEach((t) => t.stop()); onDone(); }
+    } catch (e) { setError((e as Error).message); } finally { setBusy(false); stopCamera(); onDone(); }
   };
   return (
     <Panel>

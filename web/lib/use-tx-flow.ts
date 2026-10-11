@@ -10,7 +10,6 @@ import {
 } from './wallet-client';
 import type { Activity, WalletRecord } from './server/db';
 import type { Check, PlannedCheck } from './server/policy';
-import type { DnieRequest } from '@/components/dnie-sign';
 
 export type Phase = 'idle' | 'preparing' | 'review' | 'declined' | 'stepup' | 'signing' | 'submitting' | 'confirming' | 'done' | 'error';
 type Meta = Pick<Activity, 'type' | 'title' | 'amount' | 'counterparty' | 'fee'>;
@@ -75,30 +74,19 @@ export function useTxFlow(opts: { wallet: Pick<WalletRecord, 'address' | 'owner'
     return r.txHash;
   }, [opts.wallet.address, opts.deployed, signer, meta]);
 
-  /** A step-up for this transaction that a DNI confirms on the phone. /api/dnie marks it verified once the card signs. */
-  const dnieStepUp = useCallback(async () => {
-    const { id } = await api<{ id: string }>('/api/stepup', { action: 'create', wallet: opts.wallet.address, callData: op!.callData });
-    const { request } = await api<{ request: DnieRequest }>('/api/stepup', { action: 'dnie', id });
-    return { stepUpId: id, request };
-  }, [opts.wallet.address, op]);
-
-  /** Confirm. If the policy asks for a high-value step-up, the recovery factor co-signs first (a DNI already has). */
-  const confirm = useCallback(async (card?: CardSigner, verifiedStepUp?: string) => {
+  /** Confirm. If the policy asks for a high-value step-up, the recovery factor co-signs first. */
+  const confirm = useCallback(async (card?: CardSigner) => {
     try {
       let userOp = sponsored;
       if (evaluation?.decision === 'step-up') {
         setPhase('stepup');
-        let id = verifiedStepUp;
-        if (!id) {
-          const s = await api<{ id: string; challenge: Hex }>('/api/stepup', { action: 'create', wallet: opts.wallet.address, callData: op!.callData });
-          id = s.id;
-          let signature: Hex;
-          const gB = opts.wallet.guardianB;
-          if (gB.type === 'passkey') signature = Safe.createWebAuthnSignature(await signWithPasskey([gB.credentialId], hexToBytes(s.challenge))) as Hex;
-          else if (gB.type === 'card' && card) signature = await card.sign({ hash: s.challenge });
-          else throw new Error(gB.type === 'dnie' ? 'Confirm with your ID card first' : 'Unlock your recovery card first');
-          await api('/api/stepup', { action: 'verify', id, signature });
-        }
+        const { id, challenge } = await api<{ id: string; challenge: Hex }>('/api/stepup', { action: 'create', wallet: opts.wallet.address, callData: op!.callData });
+        let signature: Hex;
+        const gB = opts.wallet.guardianB;
+        if (gB.type === 'passkey') signature = Safe.createWebAuthnSignature(await signWithPasskey([gB.credentialId], hexToBytes(challenge))) as Hex;
+        else if (gB.type === 'card' && card) signature = await card.sign({ hash: challenge });
+        else throw new Error('Unlock your recovery card first');
+        await api('/api/stepup', { action: 'verify', id, signature });
         const r = await sponsorLive(op!, id);
         setEvaluation(r.evaluation);
         if (!r.userOp) { setPhase('declined'); return; }
@@ -128,7 +116,7 @@ export function useTxFlow(opts: { wallet: Pick<WalletRecord, 'address' | 'owner'
     }
   }, [opts.deployed, opts.wallet.address, signer, signAndSend]);
 
-  return { phase, evaluation, plan, checks, checking, error, txHash, prepare, confirm, dnieStepUp, payOwnGas, reset };
+  return { phase, evaluation, plan, checks, checking, error, txHash, prepare, confirm, payOwnGas, reset };
 }
 
 export function friendly(e: unknown) {

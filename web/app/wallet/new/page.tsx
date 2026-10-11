@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   RiArrowDownSLine, RiBankLine, RiCheckLine, RiFileCopyLine, RiFingerprintLine, RiKey2Line, RiMacbookLine, RiShieldCheckFill, RiShieldKeyholeLine,
-  RiTimeLine, RiUserHeartLine, RiCheckboxCircleFill, RiArrowRightLine, RiIdCardLine, RiQrCodeLine,
+  RiTimeLine, RiUserHeartLine, RiCheckboxCircleFill, RiArrowRightLine, RiPassportLine, RiQrCodeLine,
 } from '@remixicon/react';
 import * as FancyButton from '@/components/ui/fancy-button';
 import * as Button from '@/components/ui/button';
@@ -21,8 +21,7 @@ import { useSession } from '@/components/session';
 import { createPasskey, passkeysSupported, signWithPasskey, hexToBytes, type Passkey } from '@/lib/passkey';
 import { createRecoveryCard } from '@/lib/card';
 import { counterfactualAddress, passkeySignerAddress, setupTransactions, Safe, type GuardianB } from '@/lib/chain';
-import { rsaGuardianAddress } from '@/lib/rsa-guardian';
-import { DnieSign, type DnieRequest } from '@/components/dnie-sign';
+import { PassportScan, passportGuardian, pendingScan, type ScanStart } from '@/components/passport-scan';
 import { useTxFlow, friendly } from '@/lib/use-tx-flow';
 import { api } from '@/lib/api';
 import { saveDevice } from '@/lib/device';
@@ -33,6 +32,7 @@ import { cn } from '@/utils/cn';
 type Step = 'intro' | 'passkey' | 'factor' | 'settings' | 'create' | 'proof';
 const STEPS: Step[] = ['intro', 'passkey', 'factor', 'settings', 'create', 'proof'];
 type Factor = (GuardianB & { label: string }) | null;
+const PASSPORT_SCAN = 'sq.passport.enroll.v1';
 
 export default function NewWalletPage() {
   return <RequireLogin subtitle="Log in to open your self-custody wallet."><Onboarding /></RequireLogin>;
@@ -45,6 +45,12 @@ function Onboarding() {
   const [bankAssisted, setBankAssisted] = useState(true);
   const [contact, setContact] = useState('');
   const idx = STEPS.indexOf(step);
+  // Back from ReadID Ready on this phone: the page reloaded mid-enrolment, so pick up at the backup step.
+  useEffect(() => {
+    const p = pendingScan<Passkey>(PASSPORT_SCAN);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- restore once, client-side
+    if (p?.context) { setOwner(p.context); setStep('factor'); }
+  }, []);
 
   return (
     <div className="mx-auto max-w-[560px]">
@@ -57,7 +63,7 @@ function Onboarding() {
       <div key={step} className="animate-fade-in-up">
         {step === 'intro' && <Intro onNext={() => setStep('passkey')} />}
         {step === 'passkey' && <PasskeyStep owner={owner} setOwner={setOwner} onNext={() => setStep('factor')} />}
-        {step === 'factor' && owner && <FactorStep wallet={counterfactualAddress(owner)} factor={factor} setFactor={setFactor} onNext={() => setStep('settings')} />}
+        {step === 'factor' && owner && <FactorStep owner={owner} wallet={counterfactualAddress(owner)} factor={factor} setFactor={setFactor} onNext={() => setStep('settings')} />}
         {step === 'settings' && <SettingsStep bankAssisted={bankAssisted} setBankAssisted={setBankAssisted} contact={contact} setContact={setContact} factor={factor!} onNext={() => setStep('create')} />}
         {step === 'create' && owner && factor && <CreateStep owner={owner} factor={factor} bankAssisted={bankAssisted} contact={contact} onNext={() => setStep('proof')} />}
         {step === 'proof' && owner && <ProofStep owner={owner} />}
@@ -140,9 +146,9 @@ function PasskeyStep({ owner, setOwner, onNext }: { owner: Passkey | null; setOw
   );
 }
 
-function FactorStep({ wallet, factor, setFactor, onNext }: { wallet: string; factor: Factor; setFactor: (f: Factor) => void; onNext: () => void }) {
+function FactorStep({ owner, wallet, factor, setFactor, onNext }: { owner: Passkey; wallet: string; factor: Factor; setFactor: (f: Factor) => void; onNext: () => void }) {
   const { client } = useSession();
-  const [choice, setChoice] = useState<'dnie' | 'passkey' | 'card'>('passkey');
+  const [choice, setChoice] = useState<'passport' | 'passkey' | 'card'>('passport');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pin, setPin] = useState('');
@@ -159,8 +165,8 @@ function FactorStep({ wallet, factor, setFactor, onNext }: { wallet: string; fac
       {!factor && (
         <div className="grid gap-3 sm:grid-cols-3">
           {([
-            { id: 'passkey', icon: RiMacbookLine, t: 'Passkey on another device', d: 'Your laptop, a second phone or a security key', tag: 'Recommended' },
-            { id: 'dnie', icon: RiIdCardLine, t: 'Your ID card', d: 'Tap your ID card on an Android phone, PIN-protected', tag: 'No extra device' },
+            { id: 'passport', icon: RiPassportLine, t: 'Passport or ID card', d: 'Scan its chip with your phone in the ReadID Ready app', tag: 'Recommended' },
+            { id: 'passkey', icon: RiMacbookLine, t: 'Passkey on another device', d: 'Your laptop, a second phone or a security key', tag: 'Second device' },
             { id: 'card', icon: RiQrCodeLine, t: 'Recovery card', d: 'A printable code locked with a 6-digit PIN', tag: 'Offline' },
           ] as const).map((o) => (
             <button key={o.id} aria-pressed={choice === o.id} onClick={() => setChoice(o.id)} className={cn('rounded-2xl p-4 text-left ring-1 ring-inset transition active:scale-[0.98]', choice === o.id ? 'bg-primary-alpha-10 ring-primary-base' : 'bg-bg-white-0 ring-stroke-soft-200 hover:bg-bg-weak-50')}>
@@ -172,16 +178,17 @@ function FactorStep({ wallet, factor, setFactor, onNext }: { wallet: string; fac
         </div>
       )}
 
-      {!factor && choice === 'dnie' && (
-        <DnieSign
-          create={() => api<DnieRequest>('/api/dnie', { action: 'create', purpose: 'enroll' })}
-          showRequest={false}
-          onDone={(r) => {
-            const card = r.card!;
-            setFactor({ type: 'dnie', enrollId: r.id, address: rsaGuardianAddress(wallet, card), ...card, label: card.simulated ? `Simulated ID (${card.holder})` : `ID card of ${card.holder}` });
-          }}
-          intro={<p className="text-paragraph-sm text-text-sub-600">Use your ID card and its PIN to confirm a recovery. You will need an Android phone with the Swissquote ID app to read the card.</p>}
-        />
+      {!factor && choice === 'passport' && (
+        <div className="space-y-3">
+          <p className="text-paragraph-sm text-text-sub-600">Scan your passport or ID card once now. To recover, you scan the same document again. You need a phone with NFC and Signicat&apos;s free ReadID Ready app.</p>
+          <PassportScan
+            storageKey={PASSPORT_SCAN}
+            purpose="enroll"
+            context={owner}
+            start={(callback) => passportGuardian<ScanStart>('/enroll', { wallet, callback })}
+            onDone={(s) => { const e = s.enrollment!; setFactor({ type: 'passport', enrollId: e.id, address: e.address, simulated: e.simulated, label: e.label }); }}
+          />
+        </div>
       )}
 
       {!factor && choice === 'passkey' && (
@@ -235,15 +242,15 @@ function FactorStep({ wallet, factor, setFactor, onNext }: { wallet: string; fac
       {factor && (
         <div className="flex items-center gap-3 rounded-2xl bg-success-lighter p-4">
           <RiCheckboxCircleFill className="size-6 shrink-0 text-success-base" />
-          <div className="min-w-0"><div className="text-label-sm text-text-strong-950">{factor.label} added</div>{factor.type === 'dnie' && <div className="text-paragraph-xs text-text-sub-600">{factor.documentId} · {factor.issuer} · PIN verified</div>}<div className="text-paragraph-xs text-text-sub-600">Your backup is ready for lost-device recovery.</div></div>
+          <div className="min-w-0"><div className="text-label-sm text-text-strong-950">{factor.label} added</div>{factor.type === 'passport' && !factor.simulated && <div className="text-paragraph-xs text-text-sub-600">Chip authentic and not cloned (checked by ReadID)</div>}<div className="text-paragraph-xs text-text-sub-600">Your backup is ready for lost-device recovery.</div></div>
         </div>
       )}
       {error && <Alert.Root status="error" variant="lighter" size="small"><Alert.Icon />{error}</Alert.Root>}
       {factor && <Button.Root className="h-11 w-full" onClick={onNext}>Continue<Button.Icon as={RiArrowRightLine} /></Button.Root>}
       <TechnicalDetails title="How recovery works">
         <p>Your backup is registered as Guardian B. Recovery needs approval from both your backup and Swissquote (Guardian A), followed by a safety delay of {RECOVERY_DELAY_PRODUCTION} ({RECOVERY_DELAY_LABEL} in this demo). Your original passkey can cancel during the delay. Neither guardian can make payments.</p>
-        {choice === 'dnie' && <p>Your ID card uses its signature key to approve recovery. Its PIN protects the key; only the public key is registered in an on-chain guardian contract. If you lose the card, its issuing authority handles replacement.</p>}
-        {factor && <p>Backup {factor.type === 'dnie' ? 'contract' : 'address'}: <span className="font-mono text-paragraph-xs">{shortAddress(factor.address)}</span>.</p>}
+        {choice === 'passport' && <p>A passport chip cannot sign a recovery request itself, so a separate passport guardian service holds a key for your wallet. It signs a recovery request only after you scan the same passport again, and only once ReadID confirms that the chip is authentic and not a clone. It cannot make payments, and without Swissquote&apos;s approval its signature does nothing. A renewed passport has a new document number, so it has to be enrolled again.</p>}
+        {factor && <p>Backup address: <span className="font-mono text-paragraph-xs">{shortAddress(factor.address)}</span>.</p>}
       </TechnicalDetails>
     </Card>
   );
@@ -266,7 +273,7 @@ function SettingsStep({ bankAssisted, setBankAssisted, contact, setContact, fact
         <div className="grid place-items-center text-label-sm text-text-soft-400">AND</div>
         <div className="rounded-2xl bg-bg-weak-50 p-4">
           <div className="text-subheading-2xs uppercase tracking-wider text-text-soft-400">Your backup method</div>
-          <div className="mt-2 flex items-center gap-2 text-label-sm text-text-strong-950">{factor.type === 'passkey' ? <RiMacbookLine className="size-5 text-primary-base" /> : factor.type === 'dnie' ? <RiIdCardLine className="size-5 text-primary-base" /> : <RiQrCodeLine className="size-5 text-primary-base" />}{factor.label}</div>
+          <div className="mt-2 flex items-center gap-2 text-label-sm text-text-strong-950">{factor.type === 'passkey' ? <RiMacbookLine className="size-5 text-primary-base" /> : factor.type === 'passport' ? <RiPassportLine className="size-5 text-primary-base" /> : <RiQrCodeLine className="size-5 text-primary-base" />}{factor.label}</div>
           <div className="mt-1 text-paragraph-xs text-text-sub-600">Something only you have.</div>
         </div>
       </div>

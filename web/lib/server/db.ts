@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Client, neon } from '@neondatabase/serverless';
 import { parse, stringify } from '../json';
-import type { DnieCard, GuardianB } from '../chain';
+import type { GuardianB } from '../chain';
 import type { LivenessAttestation } from '../liveness';
 
 export const DATA_DIR = process.env.DATA_DIR ?? path.join(process.cwd(), '.data');
@@ -65,22 +65,6 @@ export type Activity = {
   fee?: bigint;
 };
 export type AuditEntry = { id: string; ts: number; actor: string; action: string; wallet?: string; detail: string; outcome: 'approved' | 'declined' | 'info' };
-/** A pending DNIe signature: created by the wallet, fulfilled by the Swissquote ID app (or the demo simulator). */
-export type DnieRequest = {
-  id: string;
-  token: string; // unguessable; the phone app holds it instead of a session cookie
-  clientId: string;
-  purpose: 'enroll' | 'recovery' | 'stepup';
-  ref?: string; // recovery session id or step-up id
-  hash: string; // the 32 bytes the card signs
-  title: string;
-  lines: string[];
-  createdAt: number;
-  expires: number;
-  status: 'open' | 'done';
-  error?: string; // last failed attempt, the request stays open for a retry
-  card?: DnieCard; // set once a valid signature arrived
-};
 export type StepUp = { id: string; wallet: string; challenge: string; callDataHash: string; expires: number; verified?: boolean };
 
 type DB = {
@@ -91,11 +75,10 @@ type DB = {
   activity: Activity[];
   audit: AuditEntry[];
   stepUps: Record<string, StepUp>;
-  dnieRequests: Record<string, DnieRequest>;
   keys?: { ops: `0x${string}` }; // database store only, the file store keeps .data/keys.json
 };
 
-const empty = (): DB => ({ sessions: {}, wallets: {}, recoveries: {}, alerts: [], activity: [], audit: [], stepUps: {}, dnieRequests: {} });
+const empty = (): DB => ({ sessions: {}, wallets: {}, recoveries: {}, alerts: [], activity: [], audit: [], stepUps: {} });
 
 // Two backends: Postgres (Neon) when DATABASE_URL is set, which every Vercel instance shares, and a local JSON
 // file otherwise. Either way the whole store is one document, and a write locks it for its read-modify-write.

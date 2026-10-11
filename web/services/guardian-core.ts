@@ -3,16 +3,18 @@
 // process (guardian.ts), or deployed as a function of the separate services project (app/api/svc).
 //
 // The same program runs twice, as the two owners of the Guardian A Safe (1-of-2):
-//   GUARDIAN_ROLE=swissquote  Swissquote's recovery HSM. Requires a liveness verdict signed by  (port 4101)
-//                             the pinned liveness vendor, for this request and this wallet's client.
+//   GUARDIAN_ROLE=swissquote  Swissquote's recovery HSM. Requires a liveness verdict for this     (port 4101)
+//                             request, signed by a pinned issuer: the liveness vendor (for this wallet's client), or
+//                             the passport guardian (ReadID's live face check against the enrolled passport's chip).
 //   GUARDIAN_ROLE=partner     An independent recovery partner. Requires its own identification. (port 4102)
 //                             Also relays and hosts the rescue page, so recovery works when Swissquote is gone.
 //
 // Policy, checked against the chain for every request, never trusting the caller:
 //   1. The wallet is deployed, this guardian's Safe is one of its guardians, and no recovery is pending.
 //   2. The client's own recovery factor (Guardian B) signed exactly this recovery request.
-//   3. The client passed this guardian's identity check. For Swissquote that is a vendor-signed liveness attestation
-//      bound to this exact request, for the client named in the wallet owner's own passkey-signed ownership proof.
+//   3. The client passed this guardian's identity check. For Swissquote that is a signed liveness attestation bound
+//      to this exact request: from the vendor, for the client named in the wallet owner's own passkey-signed ownership
+//      proof; or from the passport guardian, for the document enrolled for this wallet.
 // Only then does it sign the EIP-712 request, wrapped as a SafeMessage for the Guardian A Safe. It has no other
 // signing endpoint: it cannot sign transactions, and its signature is useless without Guardian B's.
 import path from 'node:path';
@@ -30,7 +32,7 @@ export const ROLES = {
   partner: { port: 4102, name: 'Independent recovery partner', identity: 'video-ident', identityLabel: 'Video identification by the partner' },
 } as const;
 export type Role = keyof typeof ROLES;
-type Keys = { guardian: Hex; relayer: Hex; livenessVendor?: Hex };
+type Keys = { guardian: Hex; relayer: Hex; livenessVendor?: Hex; passportAttestor?: Hex };
 type Entry = { id: string; ts: number; action: string; wallet?: string; detail: string; outcome: 'approved' | 'declined' | 'info' };
 
 type ApproveReq = {
@@ -54,7 +56,7 @@ class Refusal extends ServiceError {
  * One guardian: GUARDIAN_ROLE picks the role when run as a process (guardian.ts), the route picks it when deployed.
  * Keys and logs live in this guardian's own store, generated on first use.
  */
-export function createGuardian(role: Role, opts: { livenessUrl: string; dir?: string }) {
+export function createGuardian(role: Role, opts: { livenessUrl: string; passportUrl: string; dir?: string }) {
   const cfg = ROLES[role];
   const store = createStore(`guardian-${role}`, opts.dir ?? path.join(process.cwd(), '.data', `guardian-${role}`));
 
@@ -70,17 +72,19 @@ export function createGuardian(role: Role, opts: { livenessUrl: string; dir?: st
     console.log(`[${role}] ${e.outcome.padEnd(8)} ${e.action}: ${e.detail}`);
   }
 
-  /** Swissquote's guardian trusts exactly one liveness vendor key: from env, or pinned on first contact and kept. */
-  async function livenessVendor(): Promise<string> {
-    if (process.env.LIVENESS_VENDOR) return process.env.LIVENESS_VENDOR;
-    const pinned = (await store.get<Keys>('keys'))?.livenessVendor;
+  /** Swissquote's guardian trusts one key per liveness issuer: from env, or pinned on first contact and kept. */
+  async function pin(field: 'livenessVendor' | 'passportAttestor', name: string, url: string, infoField: string, env?: string): Promise<string> {
+    if (env) return env;
+    const pinned = (await store.get<Keys>('keys'))?.[field];
     if (pinned) return pinned;
-    const info = await fetch(opts.livenessUrl + '/info', { cache: 'no-store' }).then((r) => r.json()).catch(() => null);
-    if (!isAddress(info?.address ?? '')) throw new Refusal('The liveness vendor is unreachable, so its key cannot be pinned');
-    const keys = await store.update<Keys>('keys', (k) => ({ ...k!, livenessVendor: k!.livenessVendor ?? getAddress(info.address) }));
-    await log({ action: 'Pinned liveness vendor key', detail: `${keys.livenessVendor}. Only verdicts signed by this key are accepted from now on`, outcome: 'info' });
-    return keys.livenessVendor!;
+    const info = await fetch(url + '/info', { cache: 'no-store' }).then((r) => r.json()).catch(() => null);
+    if (!isAddress(info?.[infoField] ?? '')) throw new Refusal(`The ${name} is unreachable, so its key cannot be pinned`);
+    const keys = await store.update<Keys>('keys', (k) => ({ ...k!, [field]: k![field] ?? getAddress(info[infoField]) }));
+    await log({ action: `Pinned ${name} key`, detail: `${keys[field]}. Only verdicts signed by this key are accepted from now on`, outcome: 'info' });
+    return keys[field]!;
   }
+  const livenessVendor = () => pin('livenessVendor', 'liveness vendor', opts.livenessUrl, 'address', process.env.LIVENESS_VENDOR);
+  const passportAttestor = () => pin('passportAttestor', 'passport guardian', opts.passportUrl, 'attestor', process.env.PASSPORT_ATTESTOR);
 
   /** Why the identity evidence is not enough for this request, or null if it is. */
   async function identityProblem(id: Identity | undefined, wallet: string, request: Hex, owners: string[]) {
@@ -92,7 +96,12 @@ export function createGuardian(role: Role, opts: { livenessUrl: string; dir?: st
     const c = client(NODE_RPC);
     const byOwner = await Promise.all(owners.map((o) => c.verifyHash({ address: o as Hex, hash: proof.hash, signature: id.ownershipProof.signature }).catch(() => false)));
     if (!byOwner.some(Boolean)) return 'The ownership proof is not signed by the wallet owner';
-    const bad = await checkAttestation(id.attestation, { vendor: await livenessVendor(), wallet, request, subject: proof.client });
+    // An issuer that is down just can't vouch: the other one can still be checked.
+    const issuers = (await Promise.all([
+      livenessVendor().then((address) => ({ address, name: 'liveness vendor', subject: proof.client })),
+      passportAttestor().then((address) => ({ address, name: 'passport guardian' })),
+    ].map((p) => p.catch(() => null)))).filter((i) => i !== null);
+    const bad = await checkAttestation(id.attestation, { issuers, wallet, request });
     if (bad) return bad;
     if (!id.attestation.match) return `${cfg.identityLabel} failed`;
     let reused = false;
@@ -174,5 +183,5 @@ export function createGuardian(role: Role, opts: { livenessUrl: string; dir?: st
     'POST /approve': approve,
     'POST /finalize': finalize,
   };
-  return { cfg, routes, account, livenessVendor };
+  return { cfg, routes, account, livenessVendor, passportAttestor };
 }

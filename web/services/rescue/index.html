@@ -95,8 +95,9 @@
 
       <div class="step locked" id="s-factor">
         <h3>b · Your recovery factor approves (Guardian B)</h3>
-        <p>It signs exactly this request: <span class="mono" id="request"></span></p>
-        <div class="row"><button class="secondary" id="factorPasskey">Use my recovery passkey</button></div>
+        <p>You're approving: <span id="request"></span></p>
+        <details><summary>Technical details</summary><p class="mono" id="requestRaw"></p></details>
+        <div class="row"><button class="secondary" id="factorPasskey">Use my recovery passkey</button><button class="secondary" id="factorPassport">Scan my passport</button></div>
         <p style="margin-top:14px">…or your recovery card</p>
         <textarea id="cardCode" placeholder="SQRC1.…"></textarea>
         <div class="row" style="margin-top:8px"><input id="cardPin" type="password" inputmode="numeric" maxlength="6" placeholder="6-digit PIN" style="width:160px" /><button class="secondary" id="factorCard">Unlock card and sign</button></div>

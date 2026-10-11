@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { RiArrowDownSLine, RiLogoutBoxRLine, RiShieldUserLine } from '@remixicon/react';
 import * as Avatar from '@/components/ui/avatar';
 import * as Dropdown from '@/components/ui/dropdown';
@@ -13,6 +14,7 @@ function initials(name: string) {
 /** Account menu in the AlignUI pattern: Avatar trigger + Dropdown. Account-level pages live here; money destinations live in the nav bars. */
 export function AccountMenu() {
   const { client, signedIn, logout } = useSession();
+  const router = useRouter();
   if (!client) return signedIn ? <Bone className="m-0.5 size-8 rounded-full" /> : null;
   const avatar = (size: '32' | '40') => (
     <Avatar.Root size={size} className="bg-primary-alpha-10 text-primary-dark">{initials(client.name)}</Avatar.Root>
@@ -42,7 +44,7 @@ export function AccountMenu() {
           </Link>
         </Dropdown.Item>
         <Dropdown.Separator className="mx-2 my-1 h-px bg-stroke-soft-200" />
-        <Dropdown.Item onSelect={logout}>
+        <Dropdown.Item onSelect={async () => { await logout(); router.push('/'); }}>
           <Dropdown.ItemIcon as={RiLogoutBoxRLine} />
           Log out of Swissquote
         </Dropdown.Item>

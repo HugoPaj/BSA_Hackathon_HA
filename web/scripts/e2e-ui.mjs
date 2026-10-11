@@ -1,8 +1,9 @@
 // Drives the real UI in headless Chromium with a virtual WebAuthn authenticator (CDP).
-// Usage: node scripts/e2e-ui.mjs [baseUrl] [--recover]
+// Usage: node scripts/e2e-ui.mjs [baseUrl] [--recover] [--passport]   (--passport: a simulated passport as Guardian B)
 import puppeteer from 'puppeteer-core';
 const BASE = process.argv.find((a) => a.startsWith('http')) ?? 'http://localhost:3000';
 const RECOVER = process.argv.includes('--recover');
+const PASSPORT = process.argv.includes('--passport');
 const SHOTS = process.env.SHOTS ?? '/tmp/shots';
 const t0 = Date.now(); const log = (...a) => console.log(`[${String(Math.round((Date.now() - t0) / 1000)).padStart(3)}s]`, ...a);
 
@@ -40,11 +41,17 @@ try {
   await waitText('Passkey created');
   await shot('onboarding-passkey');
   await clickText('Continue');
-  await clickText('Passkey on another device'); // the DNI is the default factor now
-  await waitText('Use another device');
-  await shot('onboarding-recovery');
-  await clickText('Add recovery passkey');
+  if (PASSPORT) {
+    await clickText('Your passport');
+    await clickText('Scan my passport');
+    await clickText('Scan simulated passport');
+  } else {
+    await clickText('Passkey on another device');
+    await waitText('Use another device');
+    await clickText('Add recovery passkey');
+  }
   await waitText('added');
+  await shot('onboarding-recovery');
   await clickText('Continue');
   await waitText('Bank-assisted recovery');
   await shot('onboarding-settings');
@@ -95,7 +102,10 @@ try {
     await clickText('Start recovery request');
     await waitText('Approve with your');
     await shot('recover-collect');
-    await clickText('Approve with recovery device');
+    if (PASSPORT) {
+      await clickText('Scan my passport to approve');
+      await clickText('Scan my passport');
+    } else await clickText('Approve with recovery device');
     await waitText('approved', 60000);
     await clickText('Start camera');
     await clickText('Face matches my ID', 30000);

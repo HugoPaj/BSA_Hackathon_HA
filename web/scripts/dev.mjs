@@ -1,6 +1,6 @@
 // Start the demo: the Swissquote web app plus each mocked share holder as its own process with its own storage.
 //   node scripts/dev.mjs            everything
-//   node scripts/dev.mjs --no-swissquote   only what survives Swissquote: the partner guardian and the rescue page
+//   node scripts/dev.mjs --no-swissquote   only what survives Swissquote: the partner and passport guardians and the rescue page
 import { spawn } from 'node:child_process';
 
 const withoutSwissquote = process.argv.includes('--no-swissquote');
@@ -8,6 +8,7 @@ const procs = [
   !withoutSwissquote && { name: 'web', color: 34, cmd: ['next', 'dev'] },
   !withoutSwissquote && { name: 'guardian', color: 35, cmd: ['tsx', 'services/guardian.ts'], env: { GUARDIAN_ROLE: 'swissquote' } },
   !withoutSwissquote && { name: 'liveness', color: 36, cmd: ['tsx', 'services/liveness.ts'] },
+  { name: 'passport', color: 31, cmd: ['tsx', 'services/passport.ts'] },
   { name: 'partner', color: 32, cmd: ['tsx', 'services/guardian.ts'], env: { GUARDIAN_ROLE: 'partner' } },
   { name: 'rescue', color: 33, cmd: ['tsx', 'services/rescue/server.mts'] },
 ].filter(Boolean);

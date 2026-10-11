@@ -2,10 +2,8 @@ import { isAddressEqual, type Hex } from 'viem';
 import { NODE_RPC } from '@/lib/config';
 import { counterfactualAddress, passkeySignerAddress, readWalletState, type GuardianB } from '@/lib/chain';
 import { audit, publicSession, read, write, type WalletRecord } from '@/lib/server/db';
-import { guardianSafe } from '@/lib/server/guardians';
+import { guardianSafe, passportEnrollment } from '@/lib/server/guardians';
 import { body, currentClient, fail, json } from '@/lib/server/session';
-import { enrolledCard } from '@/lib/server/dnie';
-import { rsaGuardianAddress } from '@/lib/rsa-guardian';
 import { syncRecoveries } from '@/lib/server/recovery';
 
 export async function GET() {
@@ -36,13 +34,12 @@ export async function POST(req: Request) {
   const r = await body<Register>(req);
   const address = counterfactualAddress(r.owner);
   if (r.guardianB.type === 'passkey' && !isAddressEqual(r.guardianB.address as Hex, passkeySignerAddress(r.guardianB))) return fail('Recovery passkey address mismatch');
-  if (r.guardianB.type === 'dnie') {
-    // Take the card from the server's own record of the PIN-verified enrolment, never from the browser.
-    let card;
-    try { card = await enrolledCard(client.clientId, r.guardianB.enrollId); } catch (e) { return fail((e as Error).message); }
-    const guardian = rsaGuardianAddress(address, card);
-    if (!isAddressEqual(r.guardianB.address as Hex, guardian)) return fail('ID card guardian address mismatch');
-    r.guardianB = { type: 'dnie', enrollId: r.guardianB.enrollId, address: guardian, ...card, label: card.simulated ? `Simulated ID (${card.holder})` : `ID card of ${card.holder}` };
+  if (r.guardianB.type === 'passport') {
+    // Take the enrolment from the passport guardian's own record, never from the browser.
+    let e;
+    try { e = await passportEnrollment(r.guardianB.enrollId); } catch (err) { return fail((err as Error).message); }
+    if (!isAddressEqual(e.wallet, address as Hex)) return fail('This passport was enrolled for another wallet');
+    r.guardianB = { type: 'passport', enrollId: e.id, address: e.address, simulated: e.simulated, label: e.label };
   }
   if (!r.bankAssisted && !/^0x[0-9a-fA-F]{40}$/.test(r.contact ?? '')) return fail('A trusted contact address is needed when bank-assisted recovery is off');
   const guardianA: WalletRecord['guardianA'] = r.bankAssisted

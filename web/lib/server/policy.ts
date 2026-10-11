@@ -119,8 +119,9 @@ export async function evaluate(op: UserOperationV7, wallet: WalletRecord, stepUp
     ? { id: 'simulation', label: 'Simulation', status: 'pass', detail: outgoing + fee > 0n ? `Balance ${formatUsdc(balanceBefore)} → ${formatUsdc(balanceAfter)} USDC` : 'No balance change' }
     : { id: 'simulation', label: 'Simulation', status: 'fail', detail: simDetail });
 
-  // 5. High-value step-up: the client's recovery factor confirms large transfers and large approvals.
-  if (highValue) {
+  // 5. High-value step-up: the client's recovery factor confirms large transfers and large approvals. Not with a
+  // passport: its guardian service only ever signs recovery requests.
+  if (highValue && wallet.guardianB.type !== 'passport') {
     const verified = stepUpId && await read((db) => {
       const s = db.stepUps[stepUpId];
       return s && s.verified && s.wallet.toLowerCase() === wallet.address.toLowerCase() && s.callDataHash === keccak256(op.callData as Hex) && s.expires > Date.now();

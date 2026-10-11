@@ -39,7 +39,7 @@ function WalletHome() {
   const isOwner = state.owners.some((o) => o.toLowerCase() === wallet.owner.signer.toLowerCase());
 
   const proof = wallet.proof;
-  const factor = wallet.guardianB.type === 'card' ? 'recovery card' : wallet.guardianB.type === 'dnie' ? 'ID card' : 'recovery passkey on another device';
+  const factor = wallet.guardianB.type === 'card' ? 'recovery card' : wallet.guardianB.type === 'passport' ? 'passport' : 'recovery passkey on another device';
 
   return (
     <div className="mx-auto grid max-w-[1080px] gap-6 lg:grid-cols-[1fr_340px]">

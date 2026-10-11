@@ -6,6 +6,7 @@ import { NODE_RPC } from '../config';
 import { deployGuardianSafeTx, guardianSafeAddress, readGuardianSafe } from '../guardian-safe';
 import { relay } from './aa';
 import type { LivenessAttestation } from '../liveness';
+import type { PublicEnrollment } from '@/services/passport-core';
 
 export const GUARDIAN_URLS = {
   swissquote: process.env.SQ_GUARDIAN_URL ?? 'http://127.0.0.1:4101',
@@ -62,25 +63,37 @@ export function requestSwissquoteApproval(req: { wallet: string; guardian: strin
 }
 
 export const LIVENESS_URL = process.env.LIVENESS_URL ?? 'http://127.0.0.1:4103';
-let vendor: Promise<string> | null = null;
+export const PASSPORT_URL = process.env.PASSPORT_URL ?? 'http://127.0.0.1:4104';
+const issuerKeys = new Map<string, Promise<string>>();
 
-/** The liveness vendor's signing key, so this backend can explain a refusal before the guardian ever sees it. */
-export function livenessVendor() {
-  vendor ??= fetch(LIVENESS_URL + '/info', { cache: 'no-store' })
-    .then((r) => r.json())
-    .then((i: { address: string }) => i.address)
-    .catch(() => {
-      vendor = null;
-      throw new Error('The liveness vendor is offline. Start it with "npm run dev".');
-    });
-  return vendor;
+/** An attestation issuer's signing key, from its /info, so this backend can explain a refusal before the guardian does. */
+function issuerKey(url: string, field: string, name: string) {
+  let key = issuerKeys.get(url);
+  if (!key) {
+    key = fetch(url + '/info', { cache: 'no-store' }).then((r) => r.json()).then((i) => i[field] as string)
+      .then((a) => { if (!a) throw new Error(); return a; })
+      .catch(() => { issuerKeys.delete(url); throw new Error(`The ${name} is offline. Start it with "npm run dev".`); });
+    issuerKeys.set(url, key);
+  }
+  return key;
+}
+export const livenessVendor = () => issuerKey(LIVENESS_URL, 'address', 'liveness vendor');
+export const passportAttestor = () => issuerKey(PASSPORT_URL, 'attestor', 'passport guardian');
+
+/** A passport enrolment, from the passport guardian's own record: what this backend registers as Guardian B. */
+export async function passportEnrollment(id: string) {
+  const res = await fetch(PASSPORT_URL + '/enrollment', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id }), cache: 'no-store' })
+    .catch(() => { throw new Error('The passport guardian is offline. Start it with "npm run dev".'); });
+  const out = await res.json();
+  if (!res.ok) throw new Error(out.error ?? 'Passport enrolment not found');
+  return out as PublicEnrollment;
 }
 
 export type GuardianLogEntry = { id: string; ts: number; action: string; wallet?: string; detail: string; outcome: 'approved' | 'declined' | 'info' };
 
-/** The guardians' and the liveness vendor's own logs, for the operations view. A service that is down simply shows no entries. */
+/** The guardians' (including the passport guardian) and the liveness vendor's own logs, for the operations view. A service that is down simply shows no entries. */
 export async function guardianLogs() {
   const [sq, partner] = await Promise.all((['swissquote', 'partner'] as const).map((r) => call<GuardianLogEntry[]>(r, '/audit').catch(() => null)));
-  const liveness = await fetch(LIVENESS_URL + '/audit', { cache: 'no-store' }).then((r) => r.json() as Promise<GuardianLogEntry[]>).catch(() => null);
-  return { swissquote: sq, partner, liveness };
+  const [liveness, passport] = await Promise.all([LIVENESS_URL, PASSPORT_URL].map((u) => fetch(u + '/audit', { cache: 'no-store' }).then((r) => r.json() as Promise<GuardianLogEntry[]>).catch(() => null)));
+  return { swissquote: sq, partner, liveness, passport };
 }

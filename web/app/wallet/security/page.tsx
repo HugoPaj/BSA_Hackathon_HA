@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import {
-  RiBankLine, RiExternalLinkLine, RiFingerprintLine, RiHistoryLine, RiIdCardLine, RiKey2Line, RiQrCodeLine, RiMacbookLine, RiRefreshLine,
+  RiBankLine, RiExternalLinkLine, RiFingerprintLine, RiHistoryLine, RiPassportLine, RiKey2Line, RiQrCodeLine, RiMacbookLine, RiRefreshLine,
   RiTimeLine, RiVerifiedBadgeFill, RiDeleteBinLine, RiSkull2Line,
 } from '@remixicon/react';
 import * as Badge from '@/components/ui/badge';
@@ -107,7 +107,7 @@ function SecurityInner({ data, refresh }: { data: WalletData; refresh: () => voi
           <div className="space-y-2">
             {state.guardians.map((g) => {
               const l = label(g);
-              const Icon = l.type === 'swissquote' ? RiBankLine : l.type === 'passkey' ? RiMacbookLine : l.type === 'card' ? RiQrCodeLine : l.type === 'dnie' ? RiIdCardLine : RiKey2Line;
+              const Icon = l.type === 'swissquote' ? RiBankLine : l.type === 'passkey' ? RiMacbookLine : l.type === 'card' ? RiQrCodeLine : l.type === 'passport' ? RiPassportLine : RiKey2Line;
               return (
                 <div key={g} className="flex items-center gap-3 rounded-xl bg-bg-weak-50 px-3 py-2.5">
                   <Icon className="size-5 shrink-0 text-text-sub-600" />

@@ -27,7 +27,7 @@ export async function GET() {
     guardianLogs(),
   ]);
   const fromGuardian = (actor: string, entries: typeof logs.swissquote) => (entries ?? []).map((e) => ({ ...e, id: `${actor}-${e.id}`, actor }));
-  const audit = [...data.audit, ...fromGuardian('Guardian HSM (own process)', logs.swissquote), ...fromGuardian('Recovery partner', logs.partner), ...fromGuardian('Liveness vendor (own process)', logs.liveness)].sort((a, b) => b.ts - a.ts);
+  const audit = [...data.audit, ...fromGuardian('Guardian HSM (own process)', logs.swissquote), ...fromGuardian('Recovery partner', logs.partner), ...fromGuardian('Liveness vendor (own process)', logs.liveness), ...fromGuardian('Passport guardian (own process)', logs.passport)].sort((a, b) => b.ts - a.ts);
   return json({
     ...data,
     audit,

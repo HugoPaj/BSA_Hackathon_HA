@@ -1,6 +1,6 @@
 // Rescue page: reach a Swissquote wallet with no Swissquote server involved.
 //   Passkey still works → sign a USDC transfer and send it through a public bundler.
-//   Passkey lost        → recovery card or recovery passkey (Guardian B) + the independent partner (Guardian A).
+//   Passkey lost        → recovery card, recovery passkey or passport (Guardian B) + the independent partner (Guardian A).
 import { CandidePaymaster, fromSafeWebauthn, type UserOperationV7 } from 'abstractionkit';
 import { p256 } from '@noble/curves/nist.js';
 import { sha256 } from '@noble/hashes/sha2.js';
@@ -32,12 +32,15 @@ async function busy(btn: HTMLButtonElement, fn: () => Promise<void>) {
   try { await fn(); } finally { btn.disabled = false; }
 }
 
-async function partner<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch('/partner' + path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+async function post<T>(base: '/partner' | '/passport', path: string, body: unknown): Promise<T> {
+  const res = await fetch(base + path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   const out = await res.json();
-  if (!res.ok) throw new Error(out.error ?? `Partner error ${res.status}`);
+  if (!res.ok) throw new Error(out.error ?? `${base === '/partner' ? 'Partner' : 'Passport guardian'} error ${res.status}`);
   return out as T;
 }
+const partner = <T>(path: string, body: unknown) => post<T>('/partner', path, body);
+// The passport guardian is not Swissquote's either: it keeps signing for enrolled passports when Swissquote is gone.
+const passport = <T>(path: string, body: unknown) => post<T>('/passport', path, body);
 
 // ── State ────────────────────────────────────────────────────────────────────────────────────────────────────
 let wallet: string | null = null;
@@ -171,7 +174,8 @@ async function createNewKey() {
   if (state!.recovery) throw new Error('A recovery is already pending for this wallet');
   newKey = await createPasskey({ userName: 'Wallet', displayName: 'Swissquote Wallet', purpose: 'wallet' });
   say('newLog', `New passkey ready. Its signer contract will be ${short(newSigner())}.`, 'ok');
-  $('request').textContent = `ExecuteRecovery(wallet ${short(wallet!)}, newOwners [${short(newSigner())}], threshold 1)`;
+  $('request').textContent = `move wallet ${short(wallet!)} to the new passkey you just created. Your old passkey will stop working.`;
+  $('requestRaw').textContent = `ExecuteRecovery(wallet ${short(wallet!)}, newOwners [${short(newSigner())}], newThreshold 1)`;
   unlock('s-factor', 's-new');
 }
 
@@ -236,6 +240,27 @@ on('factorCard', 'factorLog', async () => {
   const card = await unlockRecoveryCard($<HTMLTextAreaElement>('cardCode').value, $<HTMLInputElement>('cardPin').value);
   if (guardianB && !isAddressEqual(card.address, guardianB as Hex)) throw new Error('This card is not the recovery factor registered for this wallet');
   await approveWith((hash) => card.sign({ hash }), 'Your recovery card');
+});
+on('factorPassport', 'factorLog', async () => {
+  type Scan = { status: 'pending' | 'retry' | 'refused' | 'done'; reason?: string; signature?: Hex; hash?: Hex };
+  const expected = await requestHash();
+  const s = await passport<{ scan: string; link: string | null; simulated: boolean }>('/recover', { wallet, newOwner: newSigner(), callback: `${location.origin}/?wallet=${wallet}` });
+  let r: Scan;
+  if (s.simulated) {
+    // Simulated passports live in the browser that enrolled them (the wallet's origin), so usually not here.
+    const secret = localStorage.getItem('sq.simpassport.v1');
+    if (!secret) throw new Error('The passport guardian runs simulated, and this browser holds no simulated passport');
+    r = await passport<Scan>('/scan/simulate', { scan: s.scan, secret });
+  } else {
+    say('factorLog', `Open <a href="${s.link}">this ReadID Ready link</a> on your phone and scan your passport. This page waits for the result.`);
+    do {
+      await new Promise((ok) => setTimeout(ok, 2500));
+      r = await passport<Scan>('/scan', { scan: s.scan });
+    } while (r.status === 'pending');
+  }
+  if (r.status !== 'done') throw new Error(r.reason ?? 'The passport check failed');
+  if (r.hash?.toLowerCase() !== expected.toLowerCase()) throw new Error('The passport guardian signed a different request');
+  await approveWith(async () => r.signature!, 'Your passport guardian');
 });
 on('identOk', 'partnerLog', () => identify('match'));
 on('identBad', 'partnerLog', () => identify('mismatch'));

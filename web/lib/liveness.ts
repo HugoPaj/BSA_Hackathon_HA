@@ -4,11 +4,12 @@
 import { isAddressEqual, keccak256, recoverTypedDataAddress, toBytes, type Hex } from 'viem';
 import { CHAIN_ID } from './config';
 
-export const LIVENESS_DOMAIN = { name: 'Liveness vendor (mock)', version: '1', chainId: Number(CHAIN_ID) } as const;
+// Two issuers use this format: the liveness vendor (mock face check) and the passport guardian (ReadID's iProov check).
+export const LIVENESS_DOMAIN = { name: 'Liveness attestation', version: '1', chainId: Number(CHAIN_ID) } as const;
 export const LIVENESS_TYPES = {
   LivenessAttestation: [
     { name: 'session', type: 'string' },
-    { name: 'subject', type: 'string' }, // KYC file: the Swissquote client number
+    { name: 'subject', type: 'string' }, // KYC file: the Swissquote client number (vendor), or passport:<enrolment> (passport guardian)
     { name: 'wallet', type: 'address' },
     { name: 'request', type: 'bytes32' }, // EIP-712 hash of the recovery request the client is approving
     { name: 'match', type: 'bool' },
@@ -28,14 +29,20 @@ export function attestationTypedData(a: Omit<LivenessAttestation, 'signature'>) 
   } as const;
 }
 
-/** Why an attestation is unacceptable for this request, or null if it is a valid, fresh verdict by `vendor`. */
-export async function checkAttestation(a: LivenessAttestation | undefined, expect: { vendor: string; wallet: string; request: string; subject?: string }) {
+export type Issuer = { address: string; name: string; subject?: string };
+
+/**
+ * Why an attestation is unacceptable for this request, or null if it is a valid, fresh verdict by one of `issuers`.
+ * Each issuer has its own subject rule: the vendor attests a KYC file, the passport guardian its enrolled passport.
+ */
+export async function checkAttestation(a: LivenessAttestation | undefined, expect: { issuers: Issuer[]; wallet: string; request: string }) {
   if (!a?.signature) return 'No liveness attestation';
   const signer = await recoverTypedDataAddress({ ...attestationTypedData(a), signature: a.signature }).catch(() => null);
-  if (!signer || !isAddressEqual(signer, expect.vendor as Hex)) return 'Liveness attestation is not signed by the pinned vendor';
+  const issuer = signer && expect.issuers.find((i) => isAddressEqual(signer, i.address as Hex));
+  if (!issuer) return 'Liveness attestation is not signed by a pinned issuer';
   if (!isAddressEqual(a.wallet, expect.wallet as Hex)) return 'Liveness attestation is for another wallet';
   if (a.request.toLowerCase() !== expect.request.toLowerCase()) return 'Liveness attestation is for another recovery request';
-  if (expect.subject !== undefined && a.subject !== expect.subject) return 'Liveness attestation is for another person';
+  if (issuer.subject !== undefined && a.subject !== issuer.subject) return 'Liveness attestation is for another person';
   const age = Date.now() / 1000 - a.issuedAt;
   if (age < -60 || age > ATTESTATION_TTL_SECONDS) return 'Liveness attestation expired';
   return null;

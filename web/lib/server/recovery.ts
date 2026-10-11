@@ -6,7 +6,7 @@ import { isAddressEqual, recoverTypedDataAddress, type Hex } from 'viem';
 import { NODE_RPC, RECOVERY_DELAY_LABEL } from '../config';
 import { isValid1271, passkeySignerAddress, readWalletState, recoveryRequest, Safe, srm, type PublicKey, type WalletState } from '../chain';
 import { addActivity, alert, audit, id, read, write, type RecoverySession, type WalletRecord } from './db';
-import { guardianSafe, livenessVendor, requestSwissquoteApproval } from './guardians';
+import { guardianSafe, livenessVendor, passportAttestor, requestSwissquoteApproval } from './guardians';
 import { checkAttestation, type LivenessAttestation } from '../liveness';
 import { relay } from './aa';
 
@@ -38,7 +38,7 @@ export async function approveGuardianB(session: RecoverySession, wallet: WalletR
   if (session.status !== 'collecting') throw new Error('This recovery request is closed');
   const gB = wallet.guardianB;
   const verify = async () => {
-    if (gB.type === 'passkey' || gB.type === 'dnie') return isValid1271(NODE_RPC, gB.address, session.hash as Hex, signature);
+    if (gB.type === 'passkey') return isValid1271(NODE_RPC, gB.address, session.hash as Hex, signature);
     const { typedData } = await recoveryRequest(NODE_RPC, session.wallet, session.newOwner.signer, BigInt(session.nonce));
     const addr = await recoverTypedDataAddress({ ...typedData, signature }).catch(() => null);
     return !!addr && isAddressEqual(addr, gB.address as Hex);
@@ -55,12 +55,17 @@ export async function approveGuardianB(session: RecoverySession, wallet: WalletR
 }
 
 /**
- * The liveness vendor's signed verdict, relayed by the client's browser. We check it so we can explain a refusal
+ * A signed liveness verdict, relayed by the client's browser: from the liveness vendor, or for a passport wallet from
+ * the passport guardian (ReadID's live face check against the chip photo, done during the same scan). We check it so we can explain a refusal
  * and alert the owner, but our check grants nothing: the guardian verifies the same attestation independently.
  */
 export async function liveness(session: RecoverySession, wallet: WalletRecord, attestation: LivenessAttestation) {
   if (session.status !== 'collecting') throw new Error('This recovery request is closed');
-  const problem = await checkAttestation(attestation, { vendor: await livenessVendor(), wallet: wallet.address, request: session.hash, subject: wallet.clientId });
+  const issuers = wallet.guardianB.type === 'passport'
+    ? [{ address: await passportAttestor(), name: 'passport guardian' }]
+    : [{ address: await livenessVendor(), name: 'liveness vendor', subject: wallet.clientId }];
+  const actor = wallet.guardianB.type === 'passport' ? 'Passport guardian (ReadID face check)' : 'KYC liveness vendor';
+  const problem = await checkAttestation(attestation, { issuers, wallet: wallet.address, request: session.hash });
   if (problem) {
     await audit({ actor: 'Recovery service', action: 'Liveness attestation rejected', wallet: wallet.address, detail: problem, outcome: 'declined' });
     throw new Error(`${problem}. Run the face check again.`);
@@ -69,14 +74,14 @@ export async function liveness(session: RecoverySession, wallet: WalletRecord, a
   await write((db) => { db.recoveries[session.id].liveness = { result, at: Date.now(), attestation }; });
   if (result === 'mismatch') {
     await write((db) => { db.recoveries[session.id].status = 'refused'; });
-    await audit({ actor: 'KYC liveness vendor', action: 'Face match failed', wallet: wallet.address, detail: 'Signed verdict: the live selfie does not match the KYC file', outcome: 'declined' });
+    await audit({ actor, action: 'Face match failed', wallet: wallet.address, detail: 'Signed verdict: the live selfie does not match the KYC file', outcome: 'declined' });
     await audit({ actor: 'Recovery service', action: 'Not sent to the guardian', wallet: wallet.address, detail: 'Swissquote\'s guardian signs only after a liveness match', outcome: 'declined' });
     await alert(wallet.address, { severity: 'error', title: 'Recovery attempt blocked', body: 'A recovery attempt failed the face check against your ID. Swissquote refused to approve it. Your wallet is safe.' });
     throw new Error('The face check did not match the ID on file. Swissquote will not approve this recovery.');
   }
   const pending = await read((db) => Object.values(db.recoveries).some((r) => r.wallet === wallet.address && r.id !== session.id && r.status === 'pending'));
   if (pending) throw new Error('HSM policy: another recovery is already pending for this wallet');
-  await audit({ actor: 'KYC liveness vendor', action: 'Face match passed', wallet: wallet.address, detail: `Signed verdict for client ${attestation.subject}, bound to this recovery request`, outcome: 'approved' });
+  await audit({ actor, action: 'Face match passed', wallet: wallet.address, detail: `Signed verdict for ${wallet.guardianB.type === 'passport' ? 'the enrolled document' : `client ${attestation.subject}`}, bound to this recovery request`, outcome: 'approved' });
   return maybeSubmit(session.id);
 }
 
